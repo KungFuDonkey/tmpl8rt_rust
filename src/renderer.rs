@@ -52,27 +52,40 @@ impl Renderer
     {
     }
 
-    pub fn trace(&self, ray: &mut Ray) -> Float3
+    fn render_normals(ray: &mut Ray, scene: &Scene) -> Float3
     {
-        self.scene.intersect_scene(ray);
+        scene.intersect_scene(ray);
         if ray.obj_idx == -1
         {
             return Float3::zero();
         }
-
         let intersection = ray.intersection_point();
-        let normal = self.scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
+        let normal = scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
 
-        if self.render_mode == RenderMode::Normals
-        {
-            return (normal + 1.0) * 0.5;
-        }
-        if self.render_mode == RenderMode::Distance
-        {
-            return Float3::from_xyz(ray.t, ray.t, ray.t) * 0.1;
-        }
+        return (normal + 1.0) * 0.5;
+    }
 
-        return self.scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
+    fn render_distances(ray: &mut Ray, scene: &Scene) -> Float3
+    {
+        scene.intersect_scene(ray);
+        if ray.obj_idx == -1
+        {
+            return Float3::zero();
+        }
+        return Float3::from_xyz(ray.t, ray.t, ray.t) * 0.1;
+    }
+
+    fn trace(ray: &mut Ray, scene: &Scene) -> Float3
+    {
+        scene.intersect_scene(ray);
+        if ray.obj_idx == -1
+        {
+            return Float3::zero();
+        }
+        let intersection = ray.intersection_point();
+        let normal = scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
+
+        return scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
     }
 
     pub fn tick(&mut self, delta_time: f32)
@@ -85,14 +98,30 @@ impl Renderer
 
         self.internal_timer.reset();
 
-        for y in 0..SCRHEIGHT
-        {
-            for x in 0..SCRWIDTH
-            {
-                let mut ray = self.camera.get_primary_ray(x as f32, y as f32);
-                let ray_color = self.trace(&mut ray);
-                let rgb8_color = rgbf32_to_rgb8_f3(&ray_color);
-                self.screen.pixels[x + y * SCRWIDTH] = rgb8_color;
+        match self.render_mode {
+            RenderMode::Standard => {
+                self.screen.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                {
+                    let mut ray = self.camera.get_primary_ray_indexed(index);
+                    let ray_color = Renderer::trace(&mut ray, &self.scene);
+                    *value = rgbf32_to_rgb8_f3(&ray_color);
+                });
+            },
+            RenderMode::Normals => {
+                self.screen.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                {
+                    let mut ray = self.camera.get_primary_ray_indexed(index);
+                    let ray_color = Renderer::render_normals(&mut ray, &self.scene);
+                    *value = rgbf32_to_rgb8_f3(&ray_color);
+                });
+            },
+            RenderMode::Distance => {
+                self.screen.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                {
+                    let mut ray = self.camera.get_primary_ray_indexed(index);
+                    let ray_color = Renderer::render_distances(&mut ray, &self.scene);
+                    *value = rgbf32_to_rgb8_f3(&ray_color);
+                });
             }
         }
 
@@ -106,7 +135,6 @@ impl Renderer
         ui.radio_button(ImString::new("Ray tracing").deref(), &mut self.render_mode, RenderMode::Standard);
         ui.radio_button(ImString::new("Normals").deref(), &mut self.render_mode, RenderMode::Normals);
         ui.radio_button(ImString::new("Distance").deref(), &mut self.render_mode, RenderMode::Distance);
-
     }
 
     pub fn shutdown(&mut self)
