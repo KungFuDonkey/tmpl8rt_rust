@@ -5,7 +5,7 @@ use std::ffi::{c_void, CStr, CString};
 use std::mem::size_of;
 use std::ptr::null;
 use gl::types::*;
-use crate::screen::Screen;
+use crate::surface::Surface;
 
 #[derive(PartialEq)]
 pub enum TextureType {
@@ -128,7 +128,7 @@ impl GLTexture
         return texture;
     }
 
-    pub fn copy_from_screen(&mut self, screen: &Screen)
+    pub fn copy_from_screen(&mut self, screen: &Surface)
     {
         unsafe
         {

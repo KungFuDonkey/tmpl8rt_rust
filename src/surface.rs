@@ -3,16 +3,16 @@
 pub const SCRWIDTH: usize = 1024;
 pub const SCRHEIGHT: usize = 640;
 
-pub struct Screen
+pub struct Surface
 {
     pub pixels: Vec<u32>
 }
 
-impl Screen
+impl Surface
 {
     pub fn new() -> Self
     {
-        Screen{
+        Surface {
             pixels: vec![0; SCRWIDTH * SCRHEIGHT]
         }
     }

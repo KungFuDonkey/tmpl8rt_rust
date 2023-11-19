@@ -1,4 +1,4 @@
-use crate::screen::{SCRHEIGHT, SCRWIDTH};
+use crate::surface::{SCRHEIGHT, SCRWIDTH};
 
 pub struct Timer
 {

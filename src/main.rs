@@ -3,20 +3,23 @@ use math::Int2;
 mod camera;
 mod math;
 mod scene;
-mod renderer;
-mod screen;
+mod application;
+mod surface;
 mod opengl;
 mod timer;
+mod input;
+mod renderer;
 
-use screen::*;
+use surface::*;
 use crate::math::fminf;
 use crate::opengl::{draw_quad, GLTexture, Shader, TextureType};
-use crate::renderer::Renderer;
+use crate::application::Application;
 use crate::timer::Timer;
 use imgui_glfw_rs::glfw;
 use imgui_glfw_rs::glfw::*;
 use imgui_glfw_rs::imgui;
 use imgui_glfw_rs::ImguiGLFW;
+use input::Input;
 
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
@@ -37,8 +40,8 @@ fn main() {
         CString::new("#version 330\nuniform sampler2D c;in vec2 u;out vec4 f;void main(){f=/*sqrt*/(texture(c,u));}").unwrap()
     );
     let mut render_target: GLTexture = GLTexture::new(SCRWIDTH as u32, SCRHEIGHT as u32, TextureType::INTTARGET);
-    let mut renderer: Renderer = Renderer::new();
-    renderer.init();
+    let mut application: Application = Application::new();
+    application.init();
 
     let mut imgui = imgui::Context::create();
     let mut imgui_glfw = ImguiGLFW::new(&mut imgui, &mut window);
@@ -47,12 +50,13 @@ fn main() {
 
     let mut timer: Timer = Timer::new();
     let mut delta_time: f32 = 0.0;
+    let mut input: Input = Input::new();
 
     while !window.should_close()
     {
         delta_time = fminf(500.0, (timer.elapsed() as f32) / 1000.0);
         timer.reset();
-        renderer.tick(delta_time);
+        application.tick(delta_time);
 
         frame_nr = frame_nr + 1;
         if frame_nr == 0
@@ -60,14 +64,14 @@ fn main() {
             continue;
         }
 
-        render_target.copy_from_screen(&renderer.screen);
+        render_target.copy_from_screen(&application.renderer.render_target);
         shader.bind();
         shader.set_input_texture(0, CString::new("c").unwrap(), &render_target);
         draw_quad();
         shader.unbind();
         let mut ui = imgui_glfw.frame(&mut window, &mut imgui);
 
-        renderer.ui(&mut ui);
+        application.ui(&mut ui);
 
         imgui_glfw.draw(ui, &mut window);
 
@@ -76,10 +80,22 @@ fn main() {
         for (_, event) in glfw::flush_messages(&events) {
             handle_window_event(&mut window, &event);
             imgui_glfw.handle_event(&mut imgui, &event);
+
+            match event {
+                glfw::WindowEvent::Key(key, _, action, _) =>
+                {
+                    input.set_key(key as u32, (action == Action::Press) as u32);
+                }
+                glfw::WindowEvent::Focus(focussed) =>
+                {
+                    input.set_focus(focussed);
+                }
+                _ => {}
+            }
         }
     }
 
-    renderer.shutdown();
+    application.shutdown();
 }
 
 fn handle_window_event(window: &mut glfw::Window, event: &glfw::WindowEvent) {
