@@ -56,7 +56,7 @@ fn main() {
     {
         delta_time = fminf(500.0, (timer.elapsed() as f32) / 1000.0);
         timer.reset();
-        application.tick(delta_time);
+        application.tick(delta_time, &input);
 
         frame_nr = frame_nr + 1;
         if frame_nr == 0
@@ -84,7 +84,7 @@ fn main() {
             match event {
                 glfw::WindowEvent::Key(key, _, action, _) =>
                 {
-                    input.set_key(key as u32, (action == Action::Press) as u32);
+                    input.set_key(key as u32, (action != Action::Release) as u32);
                 }
                 glfw::WindowEvent::Focus(focussed) =>
                 {

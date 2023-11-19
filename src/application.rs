@@ -8,6 +8,7 @@ use crate::surface::*;
 use crate::timer::{FrameTimer, Timer};
 use imgui_glfw_rs::imgui::Ui;
 use imgui_glfw_rs::imgui::ImString;
+use crate::input::Input;
 use crate::renderer::{Renderer, RenderMode};
 
 
@@ -41,7 +42,7 @@ impl Application
     {
     }
 
-    pub fn tick(&mut self, delta_time: f32)
+    pub fn tick(&mut self, delta_time: f32, input: &Input)
     {
         if self.animating
         {
@@ -54,6 +55,8 @@ impl Application
         self.renderer.render(&self.scene, &self.camera);
 
         self.internal_timer.print_frame_time();
+
+        self.camera.handle_input(&input, delta_time);
     }
 
     pub fn ui(&mut self, ui: &mut Ui)

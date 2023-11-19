@@ -15,9 +15,9 @@ impl Input
         }
     }
 
-    pub fn is_key_down(&self, key: u32) -> bool
+    pub fn is_key_down(&self, key: glfw::Key) -> bool
     {
-        return self.key_state[(key & 255) as usize] == 1;
+        return self.key_state[(key as usize) & 255] == 1;
     }
 
     pub fn window_has_focus(&self) -> bool
@@ -27,7 +27,7 @@ impl Input
 
     pub fn set_key(&mut self, key: u32, value: u32)
     {
-        self.key_state[(key & 255) as usize] = value;
+        self.key_state[(key as usize) & 255] = value;
     }
 
     pub fn set_focus(&mut self, focus: bool)
