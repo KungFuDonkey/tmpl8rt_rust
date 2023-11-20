@@ -9,6 +9,7 @@ mod opengl;
 mod timer;
 mod input;
 mod renderer;
+mod material;
 
 use surface::*;
 use crate::math::fminf;

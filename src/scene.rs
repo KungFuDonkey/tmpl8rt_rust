@@ -1,5 +1,7 @@
 use std::f32::consts::PI;
+use crate::material::{BlueMaterial, CheckerBoardMaterial, LinearColorMaterial, LogoMaterial, Material, RedMaterial};
 use crate::math::*;
+use crate::surface::Surface;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RayHittableObjectType
@@ -7,6 +9,7 @@ pub enum RayHittableObjectType
     None,
     Sphere,
     Plane,
+    Cube,
     Torus
 }
 
@@ -90,7 +93,7 @@ trait RayHittableObject
 
     fn get_normal(&self, i: &Float3) -> Float3;
 
-    fn get_albedo(&self, i: &Float3) -> Float3;
+    fn get_uv(&self, i: &Float3) -> Float2;
 }
 
 trait RayOccluder
@@ -104,7 +107,8 @@ pub struct Sphere
     pub radius: f32,
     pub radius2: f32,
     pub inv_radius: f32,
-    pub obj_idx: i32
+    pub obj_idx: i32,
+    pub mat_idx: i32,
 }
 
 impl RayHittableObject for Sphere
@@ -149,19 +153,20 @@ impl RayHittableObject for Sphere
         return (*i - self.position) * self.inv_radius;
     }
 
-    fn get_albedo(&self, i: &Float3) -> Float3
+    fn get_uv(&self, i: &Float3) -> Float2
     {
-        return Float3::from_a(0.93)
+        Float2::zero()
     }
 }
 
 impl Sphere
 {
-    fn new(obj_idx: i32, position: Float3, radius: f32) -> Self
+    fn new(obj_idx: i32, mat_idx: i32, position: Float3, radius: f32) -> Self
     {
         Sphere
         {
             obj_idx,
+            mat_idx,
             position,
             radius,
             radius2: radius * radius,
@@ -170,11 +175,59 @@ impl Sphere
     }
 }
 
+pub struct PlaneUVFunction
+{
+    f: fn(i: &Float3) -> Float2
+}
+
+impl PlaneUVFunction
+{
+    pub fn empty() -> Self
+    {
+        PlaneUVFunction
+        {
+            f: |i: &Float3| Float2::zero()
+        }
+    }
+
+    pub fn xz() -> Self
+    {
+        PlaneUVFunction
+        {
+            f: |i: &Float3| {
+                Float2::from_xy(i.x, i.z)
+            }
+        }
+    }
+
+    pub fn xy() -> Self
+    {
+        PlaneUVFunction
+        {
+            f: |i: &Float3| {
+                Float2::from_xy(i.x, i.y)
+            }
+        }
+    }
+
+    pub fn zy() -> Self
+    {
+        PlaneUVFunction
+        {
+            f: |i: &Float3| {
+                Float2::from_xy(i.z, i.y)
+            }
+        }
+    }
+}
+
 pub struct Plane
 {
     pub obj_idx: i32,
+    pub mat_idx: i32,
     pub normal: Float3,
-    pub distance: f32
+    pub distance: f32,
+    pub uv_function: PlaneUVFunction
 }
 
 impl RayHittableObject for Plane
@@ -193,19 +246,22 @@ impl RayHittableObject for Plane
         return self.normal;
     }
 
-    fn get_albedo(&self, i: &Float3) -> Float3 {
-        return Float3::from_xyz(1.0, 0.0, 0.0);
+    fn get_uv(&self, i: &Float3) -> Float2
+    {
+        return (self.uv_function.f)(i)
     }
 }
 
 impl Plane
 {
-    pub fn new(obj_idx: i32, normal: Float3, distance: f32) -> Self
+    pub fn new(obj_idx: i32, mat_idx: i32, normal: Float3, distance: f32, uv_function: PlaneUVFunction) -> Self
     {
         Plane{
             obj_idx,
+            mat_idx,
             normal,
-            distance
+            distance,
+            uv_function
         }
     }
 }
@@ -213,6 +269,7 @@ impl Plane
 pub struct Cube
 {
     pub obj_idx: i32,
+    pub mat_idx: i32,
     pub b: [Float3; 2],
     pub m: Mat4,
     pub inv_m: Mat4
@@ -258,7 +315,7 @@ impl RayHittableObject for Cube
             {
                 ray.t = tmin;
                 ray.obj_idx = self.obj_idx;
-                ray.obj_type = RayHittableObjectType::Plane;
+                ray.obj_type = RayHittableObjectType::Cube;
             }
         }
         else if tmax > 0.0
@@ -267,7 +324,7 @@ impl RayHittableObject for Cube
             {
                 ray.t = tmax;
                 ray.obj_idx = self.obj_idx;
-                ray.obj_type = RayHittableObjectType::Plane;
+                ray.obj_type = RayHittableObjectType::Cube;
             }
         }
     }
@@ -311,17 +368,19 @@ impl RayHittableObject for Cube
         return transform_vector(&n, &self.m);
     }
 
-    fn get_albedo(&self, i: &Float3) -> Float3 {
-        return Float3::from_a(1.0);
+    fn get_uv(&self, i: &Float3) -> Float2
+    {
+        Float2::zero()
     }
 }
 
 impl Cube
 {
-    pub fn new(obj_idx: i32, pos: Float3, size: Float3) -> Self
+    pub fn new(obj_idx: i32, mat_idx: i32, pos: Float3, size: Float3) -> Self
     {
         Cube{
             obj_idx,
+            mat_idx,
             b:[
                 pos - size * 0.5,
                 pos + size * 0.5
@@ -338,17 +397,19 @@ pub struct Torus
     pub rc2: f32,
     pub r2: f32,
     pub obj_idx: i32,
+    pub mat_idx: i32,
     pub t: Mat4,
     pub inv_t: Mat4
 }
 
 impl Torus
 {
-    pub fn new(obj_idx: i32, a: f32, b: f32) -> Self
+    pub fn new(obj_idx: i32, mat_idx: i32, a: f32, b: f32) -> Self
     {
         Torus
         {
             obj_idx,
+            mat_idx,
             rc2: a * a,
             rt2: b * b,
             t: Mat4::identity_matrix(),
@@ -510,8 +571,8 @@ impl RayHittableObject for Torus
         return transform_vector(&n, &self.t);
     }
 
-    fn get_albedo(&self, i: &Float3) -> Float3 {
-        return Float3::from_a(1.0);
+    fn get_uv(&self, i: &Float3) -> Float2 {
+        Float2::zero()
     }
 }
 
@@ -522,6 +583,7 @@ pub struct Scene
     planes: Vec<Plane>,
     cubes: Vec<Cube>,
     tori: Vec<Torus>,
+    materials: Vec<Box<dyn Material + Sync>>,
     animation_time: f32,
 }
 
@@ -529,29 +591,37 @@ impl Scene
 {
     pub fn new() -> Self
     {
-        let mut torus = Torus::new(0, 0.8, 0.25);
+        let mut torus = Torus::new(0, 0, 0.8, 0.25);
         let translation = Float3::from_xyz(-0.25, 0.0, 2.0);
         torus.t = Mat4::translate(&translation) * Mat4::rotate_x(PI / 4.0);
         torus.inv_t = torus.t.inverted();
 
         Scene{
             spheres: vec![
-                Sphere::new(0, Float3::from_a(0.0), 0.6),
-                Sphere::new(1, Float3::from_xyz( 0.0, 2.5, -3.07 ), 8.0)
+                Sphere::new(0, 0, Float3::from_a(0.0), 0.6),
+                Sphere::new(1, 0, Float3::from_xyz( 0.0, 2.5, -3.07 ), 8.0)
             ],
             planes: vec![
-                Plane::new(0, Float3::from_xyz(1.0, 0.0, 0.0), 3.0),
-                Plane::new(1, Float3::from_xyz(-1.0, 0.0, 0.0), 2.99),
-                Plane::new(2, Float3::from_xyz(0.0, 1.0, 0.0), 1.0),
-                Plane::new(3, Float3::from_xyz(0.0, -1.0, 0.0), 2.0),
-                Plane::new(4, Float3::from_xyz(0.0, 0.0, 1.0), 3.0),
-                Plane::new(5, Float3::from_xyz(0.0, 0.0, -1.0), 3.99),
+                Plane::new(0, 4, Float3::from_xyz(1.0, 0.0, 0.0), 3.0, PlaneUVFunction::zy()),
+                Plane::new(1, 5, Float3::from_xyz(-1.0, 0.0, 0.0), 2.99, PlaneUVFunction::zy()),
+                Plane::new(2, 2, Float3::from_xyz(0.0, 1.0, 0.0), 1.0, PlaneUVFunction::xz()),
+                Plane::new(3, 1, Float3::from_xyz(0.0, -1.0, 0.0), 2.0, PlaneUVFunction::empty()),
+                Plane::new(4, 1, Float3::from_xyz(0.0, 0.0, 1.0), 3.0, PlaneUVFunction::empty()),
+                Plane::new(5, 3, Float3::from_xyz(0.0, 0.0, -1.0), 3.99, PlaneUVFunction::xy()),
             ],
             cubes: vec![
-                Cube::new(0, Float3::zero(), Float3::from_a(1.15))
+                Cube::new(0, 0, Float3::zero(), Float3::from_a(1.15))
             ],
             tori: vec![
                 torus
+            ],
+            materials: vec![
+                Box::new(LinearColorMaterial::new(Float3::from_a(1.0))),
+                Box::new(LinearColorMaterial::new(Float3::from_a(0.93))),
+                Box::new(CheckerBoardMaterial::new()),
+                Box::new(LogoMaterial::new()),
+                Box::new(RedMaterial::new()),
+                Box::new(BlueMaterial::new())
             ],
             animation_time: 0.0
         }
@@ -604,6 +674,10 @@ impl Scene
             {
                 self.planes[obj_idx as usize].get_normal(i)
             },
+            RayHittableObjectType::Cube =>
+            {
+                self.cubes[obj_idx as usize].get_normal(i)
+            },
             RayHittableObjectType::Torus =>
             {
                 self.tori[obj_idx as usize].get_normal(i)
@@ -613,25 +687,40 @@ impl Scene
 
     pub fn get_albedo(&self, obj_idx: i32, obj_type: &RayHittableObjectType, i: &Float3) -> Float3
     {
-        match obj_type
+        let (uv, mat_idx) = match obj_type
         {
             RayHittableObjectType::None =>
             {
-                Float3::zero()
+                (Float2::zero(), -1)
             },
             RayHittableObjectType::Sphere =>
             {
-                self.spheres[obj_idx as usize].get_albedo(i)
+                let s = &self.spheres[obj_idx as usize];
+                (s.get_uv(i), s.mat_idx)
             }
             RayHittableObjectType::Plane =>
             {
-                self.planes[obj_idx as usize].get_albedo(i)
+                let p = &self.planes[obj_idx as usize];
+                (p.get_uv(i), p.mat_idx)
+            }
+            RayHittableObjectType::Cube =>
+            {
+                let c = &self.cubes[obj_idx as usize];
+                (c.get_uv(i), c.mat_idx)
             }
             RayHittableObjectType::Torus =>
             {
-                self.tori[obj_idx as usize].get_albedo(i)
+                let t = &self.tori[obj_idx as usize];
+                (t.get_uv(i), t.mat_idx)
             }
+        };
+
+        if mat_idx == -1
+        {
+            return Float3::zero();
         }
+
+        return self.materials[mat_idx as usize].get_color(&uv);
     }
 
     pub fn set_time(&mut self, time: f32)

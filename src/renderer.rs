@@ -26,7 +26,7 @@ impl Renderer
         Renderer{
             accumulator: vec![Float4::zero(); SCRWIDTH * SCRHEIGHT],
             render_target: Surface::new(),
-            render_mode: RenderMode::Normals
+            render_mode: RenderMode::Standard
         }
     }
 
