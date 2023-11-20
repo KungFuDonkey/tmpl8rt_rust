@@ -638,36 +638,19 @@ impl_single_operator_4!(Float4, f32, Div<f32>, f32, div);
 impl_single_operator_4!(Int4, i32, Shl<i32>, i32, shl);
 impl_single_operator_4!(Int4, i32, Shr<i32>, i32, shr);
 
-
-pub fn fminf(a: f32, b: f32) -> f32
-{
-    if a < b {
-        return a
-    }
-    return b;
-}
-
-pub fn fmaxf(a: f32, b: f32) -> f32
-{
-    if a > b {
-        return a;
-    }
-    return b;
-}
-
 pub fn min_f2(a: &Float2, b: &Float2 ) -> Float2
 {
-    return Float2::from_xy( fminf( a.x, b.x ), fminf( a.y, b.y ) );
+    return Float2::from_xy( a.x.min(b.x) , a.y.min(b.y) );
 }
 
 pub fn min_f3(a: &Float3, b: &Float3 ) -> Float3
 {
-    return Float3::from_xyz( fminf( a.x, b.x ), fminf( a.y, b.y ), fminf( a.z, b.z ) );
+    return Float3::from_xyz( a.x.min(b.x), a.y.min(b.y), a.z.min( b.z ) );
 }
 
 pub fn min_f4(a: &Float4, b: &Float4 ) -> Float4
 {
-    return Float4::from_xyzw( fminf( a.x, b.x ), fminf( a.y, b.y ), fminf( a.z, b.z ), fminf( a.w, b.w ) )
+    return Float4::from_xyzw( a.x.min(b.x), a.y.min(b.y), a.z.min( b.z ) , a.w.min( b.w ) )
 }
 
 pub fn min_i2(a: &Int2, b: &Int2 ) -> Int2
@@ -702,17 +685,17 @@ pub fn min_u4(a: &Uint4, b: &Uint4 ) -> Uint4
 
 pub fn max_f2(a: &Float2, b: &Float2 ) -> Float2
 {
-    return Float2::from_xy( fmaxf( a.x, b.x ), fmaxf( a.y, b.y ) );
+    return Float2::from_xy( a.x.max( b.x ), a.y.max( b.y ) );
 }
 
 pub fn max_f3(a: &Float3, b: &Float3 ) -> Float3
 {
-    return Float3::from_xyz( fmaxf( a.x, b.x ), fmaxf( a.y, b.y ), fmaxf( a.z, b.z ) );
+    return Float3::from_xyz( a.x.max( b.x ), a.y.max( b.y ) , a.z.max( b.z ) );
 }
 
 pub fn max_f4(a: &Float4, b: &Float4 ) -> Float4
 {
-    return Float4::from_xyzw( fmaxf( a.x, b.x ), fmaxf( a.y, b.y ), fmaxf( a.z, b.z ), fmaxf( a.w, b.w ) )
+    return Float4::from_xyzw( a.x.max( b.x ), a.y.max( b.y ) , a.z.max( b.z ) , a.w.max(b.w ) )
 }
 
 pub fn max_i2(a: &Int2, b: &Int2 ) -> Int2
@@ -767,7 +750,7 @@ pub fn lerp_f4(a: &Float4, b: &Float4, t: f32) -> Float4
 
 pub fn clamp_f(f: f32, a: f32, b: f32) -> f32
 {
-    return fmaxf( a, fminf( f, b ) );
+    return a.max(f.min( b ) );
 }
 
 pub fn clamp_i(f: i32, a: i32, b: i32) -> i32
@@ -1133,16 +1116,16 @@ pub fn transform_vector(a: &Float3, m: &Mat4) -> Float3
 
 pub fn rgbf32_to_rgb8_f4(value: &Float4) -> u32
 {
-    let r: u32 = (255.0 * fminf(1.0, value.x)) as u32;
-    let g: u32 = (255.0 * fminf(1.0, value.y)) as u32;
-    let b: u32 = (255.0 * fminf(1.0, value.z)) as u32;
+    let r: u32 = (255.0 * value.x.min(1.0)) as u32;
+    let g: u32 = (255.0 * value.y.min(1.0)) as u32;
+    let b: u32 = (255.0 * value.z.min(1.0)) as u32;
     return (r << 16) + (g << 8) + b;
 }
 
 pub fn rgbf32_to_rgb8_f3(value: &Float3) -> u32
 {
-    let r: u32 = (255.0 * fminf(1.0, value.x)) as u32;
-    let g: u32 = (255.0 * fminf(1.0, value.y)) as u32;
-    let b: u32 = (255.0 * fminf(1.0, value.z)) as u32;
+    let r: u32 = (255.0 * value.x.min(1.0)) as u32;
+    let g: u32 = (255.0 * value.y.min(1.0)) as u32;
+    let b: u32 = (255.0 * value.z.min(1.0)) as u32;
     return (r << 16) + (g << 8) + b;
 }

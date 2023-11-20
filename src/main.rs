@@ -12,7 +12,6 @@ mod renderer;
 mod material;
 
 use surface::*;
-use crate::math::fminf;
 use crate::opengl::{draw_quad, GLTexture, Shader, TextureType};
 use crate::application::Application;
 use crate::timer::Timer;
@@ -55,7 +54,7 @@ fn main() {
 
     while !window.should_close()
     {
-        delta_time = fminf(500.0, (timer.elapsed() as f32) / 1000.0);
+        delta_time = ((timer.elapsed() as f32) / 1000.0).min(500.0);
         timer.reset();
         application.tick(delta_time, &input);
 

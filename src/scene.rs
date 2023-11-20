@@ -297,8 +297,8 @@ impl RayHittableObject for Cube
             return;
         }
 
-        tmin = fmaxf(tmin, tymin);
-        tmax = fminf(tmax, tymax);
+        tmin = tmin.max(tymin);
+        tmax = tmax.min(tymax);
         let tzmin = (self.b[signz].z - origin.z) * rdz;
         let tzmax = (self.b[1 - signz].z - origin.z) * rdz;
 
@@ -307,8 +307,8 @@ impl RayHittableObject for Cube
             return;
         }
 
-        tmin = fmaxf(tmin, tzmin);
-        tmax = fminf(tmax, tzmax);
+        tmin = tmin.max(tzmin);
+        tmax = tmax.min(tzmax);
         if tmin > 0.0
         {
             if tmin < ray.t
