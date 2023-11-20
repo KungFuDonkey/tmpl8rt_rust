@@ -13,7 +13,7 @@ pub struct LinearColorMaterial
 
 impl Material for LinearColorMaterial
 {
-    fn get_color(&self, uv: &Float2) -> Float3
+    fn get_color(&self, _: &Float2) -> Float3
     {
         return self.color;
     }

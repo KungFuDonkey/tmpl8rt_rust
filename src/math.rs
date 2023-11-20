@@ -1,9 +1,5 @@
 #![allow(dead_code)]
-
-use std::cmp::min;
-use std::cmp::max;
 use std::ops::*;
-use std::process::Output;
 
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy)]
@@ -712,23 +708,18 @@ impl_single_operator_4!(Int4, i32, Shr<i32>, i32, shr);
 
 pub trait VectorMinMax
 {
-
-    #[inline(always)]
     fn min(&self, rhs: &Self) -> Self;
 
-    #[inline(always)]
     fn max(&self, rhs: &Self) -> Self;
 
 }
 
 impl VectorMinMax for Float2
 {
-    #[inline(always)]
     fn min(&self, rhs: &Self) -> Self {
         Self::from_xy( self.x.min(rhs.x) , self.y.min(rhs.y) )
     }
 
-    #[inline(always)]
     fn max(&self, rhs: &Self) -> Self {
         Self::from_xy( self.x.max( rhs.x ), self.y.max( rhs.y ) )
     }
@@ -1214,7 +1205,6 @@ pub fn sqr_length<T>(a: &T) -> <T as VectorLength>::SqrLengthOutput
 
 pub trait VectorNormalize
 {
-    #[inline(always)]
     fn normalize(&self) -> Self;
 }
 
@@ -1251,7 +1241,6 @@ pub fn normalize<T>(a: &T) -> T
 
 pub trait VectorReflect
 {
-    #[inline(always)]
     fn reflect(&self, n: &Self) -> Self;
 }
 
@@ -1273,7 +1262,6 @@ pub fn reflect<T>(a: &T, b: &T) -> T
 
 pub trait VectorCross
 {
-    #[inline(always)]
     fn cross(a: &Self, b: &Self) -> Self;
 }
 

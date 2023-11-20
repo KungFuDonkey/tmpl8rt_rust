@@ -1,5 +1,4 @@
 use std::ffi::CString;
-use math::Int2;
 mod camera;
 mod math;
 mod scene;
@@ -35,7 +34,7 @@ fn main() {
     gl::load_with(|s| glfw.get_proc_address_raw(s));
     gl::Viewport::load_with(|s| glfw.get_proc_address_raw(s));
 
-    let mut shader: Shader = Shader::compile(
+    let shader: Shader = Shader::compile(
        CString::new("#version 330\nin vec4 p;\nin vec2 t;out vec2 u;void main(){u=t;gl_Position=p;}").unwrap(),
         CString::new("#version 330\nuniform sampler2D c;in vec2 u;out vec4 f;void main(){f=/*sqrt*/(texture(c,u));}").unwrap()
     );
@@ -49,7 +48,7 @@ fn main() {
     let mut frame_nr: i64 = -1;
 
     let mut timer: Timer = Timer::new();
-    let mut delta_time: f32 = 0.0;
+    let mut delta_time: f32;
     let mut input: Input = Input::new();
 
     while !window.should_close()

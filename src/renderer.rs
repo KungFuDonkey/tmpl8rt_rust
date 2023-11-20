@@ -14,7 +14,7 @@ pub enum RenderMode
 
 pub struct Renderer
 {
-    accumulator: Vec<Float4>,
+    //accumulator: Vec<Float4>,
     pub render_target: Surface,
     pub render_mode: RenderMode,
 }
@@ -24,7 +24,7 @@ impl Renderer
     pub fn new() -> Renderer
     {
         Renderer{
-            accumulator: vec![Float4::zero(); SCRWIDTH * SCRHEIGHT],
+            //accumulator: vec![Float4::zero(); SCRWIDTH * SCRHEIGHT],
             render_target: Surface::new(),
             render_mode: RenderMode::Standard
         }

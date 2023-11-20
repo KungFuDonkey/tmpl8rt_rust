@@ -1,7 +1,5 @@
-
 use std::ops::{Deref};
 use crate::camera::Camera;
-use crate::math::*;
 use crate::scene::{Scene};
 use crate::timer::{FrameTimer};
 use imgui_glfw_rs::imgui::Ui;
@@ -15,7 +13,6 @@ pub struct Application
     pub renderer: Renderer,
     camera: Camera,
     scene: Scene,
-    mouse_pos: Int2,
     animating: bool,
     animation_time: f32,
     internal_timer: FrameTimer
@@ -29,7 +26,6 @@ impl Application
             renderer: Renderer::new(),
             camera: Camera::new(),
             scene: Scene::new(),
-            mouse_pos: Int2::zero(),
             animating: true,
             animation_time: 0.0,
             internal_timer: FrameTimer::new()

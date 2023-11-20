@@ -18,7 +18,7 @@ pub fn create_vbo(data: *const GLfloat, size: usize) -> GLuint
     let mut id: GLuint = 0;
     unsafe
     {
-        let mut id_ptr: *mut GLuint = &mut id as *mut GLuint;
+        let id_ptr: *mut GLuint = &mut id as *mut GLuint;
         gl::GenBuffers(1, id_ptr);
         gl::BindBuffer(gl::ARRAY_BUFFER, id);
         gl::BufferData(gl::ARRAY_BUFFER, size as GLsizeiptr, data as *const c_void, gl::STATIC_DRAW)
@@ -46,13 +46,15 @@ pub fn draw_quad()
         {
             let verts: [GLfloat; 18] = [-1.0, 1.0, 0.0, 1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, -1.0, 0.0];
             let uvdata: [GLfloat; 12] = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
-            let verts_igp: [GLfloat; 18] = [0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0];
-            let uvdata_igp: [GLfloat; 12] = [-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
+
+            // use if it goes wrong?
+            //let verts_igp: [GLfloat; 18] = [0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+            //let uvdata_igp: [GLfloat; 12] = [-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
 
             let vertex_buffer = create_vbo(verts.as_ptr(), 18 * 4);
             let uv_buffer = create_vbo(uvdata.as_ptr(), 18 * 4);
 
-            let mut vao_ptr: *mut GLuint = &mut VAO as *mut GLuint;
+            let vao_ptr: *mut GLuint = &mut VAO as *mut GLuint;
             gl::GenVertexArrays(1, vao_ptr);
             gl::BindVertexArray(VAO);
 
@@ -82,7 +84,7 @@ impl GLTexture
         unsafe
         {
             let mut texture_id: GLuint = 123;
-            let mut texture_ptr: *mut GLuint = &mut texture_id as *mut GLuint;
+            let texture_ptr: *mut GLuint = &mut texture_id as *mut GLuint;
 
             gl::GenTextures(1, texture_ptr);
             gl::BindTexture(gl::TEXTURE_2D, texture_id);

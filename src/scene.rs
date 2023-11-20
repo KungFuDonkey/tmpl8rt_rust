@@ -1,7 +1,6 @@
 use std::f32::consts::PI;
 use crate::material::{BlueMaterial, CheckerBoardMaterial, LinearColorMaterial, LogoMaterial, Material, RedMaterial};
 use crate::math::*;
-use crate::surface::Surface;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RayHittableObjectType
@@ -27,58 +26,45 @@ pub struct Ray {
 
 impl Ray {
 
+    #![allow(dead_code)]
     pub fn new() -> Self
     {
-        let r: Ray;
-        unsafe
-        {
-            r = Ray {
-                origin: Float3::zero(),
-                direction: Float3::zero(),
-                r_direction: Float3::zero(),
-                t: 1.0e34,
-                obj_idx: -1,
-                obj_type: RayHittableObjectType::None,
-                inside: false
-            };
+        Ray {
+            origin: Float3::zero(),
+            direction: Float3::zero(),
+            r_direction: Float3::zero(),
+            t: 1.0e34,
+            obj_idx: -1,
+            obj_type: RayHittableObjectType::None,
+            inside: false
         }
-        return r;
     }
 
     pub fn directed(origin: Float3, direction: Float3) -> Self
     {
-        let r: Ray;
-        unsafe
-            {
-                r = Ray {
-                    origin: Float3::from_xyz(origin.x, origin.y, origin.z),
-                    direction: Float3::from_xyz(direction.x, direction.y, direction.z),
-                    r_direction: Float3::from_xyz(1.0 / direction.x, 1.0 / direction.y, 1.0 / direction.z),
-                    t: 1.0e34,
-                    obj_idx: -1,
-                    obj_type: RayHittableObjectType::None,
-                    inside: false
-                };
-            }
-        return r;
+        Ray {
+            origin: Float3::from_xyz(origin.x, origin.y, origin.z),
+            direction: Float3::from_xyz(direction.x, direction.y, direction.z),
+            r_direction: Float3::from_xyz(1.0 / direction.x, 1.0 / direction.y, 1.0 / direction.z),
+            t: 1.0e34,
+            obj_idx: -1,
+            obj_type: RayHittableObjectType::None,
+            inside: false
+        }
     }
 
+    #[allow(dead_code)]
     pub fn directed_distance(origin: Float3, direction: Float3, distance: f32) -> Self
     {
-        let r: Ray;
-        unsafe
-            {
-                r =  Ray {
-                    origin: Float3::from_xyz(origin.x, origin.y, origin.z),
-                    direction: Float3::from_xyz(direction.x, direction.y, direction.z),
-                    r_direction: Float3::from_xyz(1.0 / direction.x, 1.0 / direction.y, 1.0 / direction.z),
-                    t: distance,
-                    obj_idx: -1,
-                    obj_type: RayHittableObjectType::None,
-                    inside: false
-                };
-            }
-        return r;
+        Ray {
+            origin: Float3::from_xyz(origin.x, origin.y, origin.z),
+            direction: Float3::from_xyz(direction.x, direction.y, direction.z),
+            r_direction: Float3::from_xyz(1.0 / direction.x, 1.0 / direction.y, 1.0 / direction.z),
+            t: distance,
+            obj_idx: -1,
+            obj_type: RayHittableObjectType::None,
+            inside: false
+        }
     }
 
     pub fn intersection_point(&self) -> Float3
@@ -186,7 +172,7 @@ impl PlaneUVFunction
     {
         PlaneUVFunction
         {
-            f: |i: &Float3| Float2::zero()
+            f: |_: &Float3| Float2::zero()
         }
     }
 
@@ -242,7 +228,7 @@ impl RayHittableObject for Plane
         }
     }
 
-    fn get_normal(&self, i: &Float3) -> Float3 {
+    fn get_normal(&self, _: &Float3) -> Float3 {
         return self.normal;
     }
 
@@ -361,7 +347,6 @@ impl RayHittableObject for Cube
         }
         if d5 < min_dist
         {
-            min_dist = d5;
             n = Float3::from_xyz(0.0, 0.0, 1.0);
         }
 
@@ -437,8 +422,8 @@ impl RayHittableObject for Torus
 {
     fn intersect(&self, ray: &mut Ray) {
         // via: https://www.shadertoy.com/view/4sBGDy
-        let O: Float3 = transform_position( &ray.origin, &self.inv_t );
-        let D: Float3 = transform_vector(&ray.direction, &self.inv_t);
+        let origin: Float3 = transform_position(&ray.origin, &self.inv_t );
+        let distance: Float3 = transform_vector(&ray.direction, &self.inv_t);
 
         let r2 = self.r2 as f64;
         let rt2 = self.rt2 as f64;
@@ -446,8 +431,8 @@ impl RayHittableObject for Torus
 
         // extension rays need double precision for the quadratic solver!
         let mut po = 1.0;
-        let mut m = dot(&O, &O) as f64;
-        let mut k3 = dot(&O, &D) as f64;
+        let m = dot(&origin, &origin) as f64;
+        let mut k3 = dot(&origin, &distance) as f64;
         let mut k32 = k3 * k3;
 
         // bounding sphere test
@@ -458,10 +443,10 @@ impl RayHittableObject for Torus
         }
 
         // setup torus intersection
-        let mut k = (m - rt2 - rc2) * 0.5;
-        let mut k2 = k32 + rc2 * ((D.z * D.z) as f64) + k;
-        let mut k1 = k * k3 + rc2 * ((O.z * D.z) as f64);
-        let mut k0 = k * k + rc2 * ((O.z * O.z) as f64) - rc2 * rt2;
+        let k = (m - rt2 - rc2) * 0.5;
+        let mut k2 = k32 + rc2 * ((distance.z * distance.z) as f64) + k;
+        let mut k1 = k * k3 + rc2 * ((origin.z * distance.z) as f64);
+        let mut k0 = k * k + rc2 * ((origin.z * origin.z) as f64) - rc2 * rt2;
         // solve quadratic equation
         if ( k3 * (k32 - k2) + k1 ).abs() < 0.0001
         {
@@ -481,18 +466,18 @@ impl RayHittableObject for Torus
         c2 *= 0.33333333333;
         c1 *= 2.0;
         c0 *= 0.33333333333;
-        let mut q = c2 * c2 + c0;
-        let mut r = 3.0 * c0 * c2 - c2 * c2 * c2 - c1 * c1;
+        let q = c2 * c2 + c0;
+        let r = 3.0 * c0 * c2 - c2 * c2 * c2 - c1 * c1;
         let mut h = r * r - q * q * q;
         let mut z: f64;
         if h < 0.0
         {
-            let mut s_q = q.sqrt();
+            let s_q = q.sqrt();
             z = 2.0 * s_q * ((r / (s_q * q)).acos() * 0.33333333333).cos();
         }
         else
         {
-            let mut s_q = Torus::cbrt_fast(h.sqrt() + r.abs());
+            let s_q = Torus::cbrt_fast(h.sqrt() + r.abs());
             z = ( s_q + q / s_q).abs().copysign(r);
         }
         z = c2 - z;
@@ -555,7 +540,7 @@ impl RayHittableObject for Torus
                 t = t.min(t2);
             }
         }
-        let mut ft = t as f32;
+        let ft = t as f32;
         if ft > 0.0 && ft < ray.t
         {
             ray.t = ft;
@@ -659,7 +644,7 @@ impl Scene
             return Float3::zero();
         }
 
-        match obj_type
+        let normal = match obj_type
         {
             RayHittableObjectType::None =>
             {
@@ -682,7 +667,13 @@ impl Scene
             {
                 self.tori[obj_idx as usize].get_normal(i)
             }
+        };
+
+        if dot(&normal, &wo) > 0.0
+        {
+            return -normal;
         }
+        return normal;
     }
 
     pub fn get_albedo(&self, obj_idx: i32, obj_type: &RayHittableObjectType, i: &Float3) -> Float3

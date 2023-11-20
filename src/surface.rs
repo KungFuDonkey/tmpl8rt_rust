@@ -32,9 +32,4 @@ impl Surface
 
         return Surface { pixels }
     }
-
-    pub fn set_pixel(&mut self, x: usize, y: usize, value: u32)
-    {
-        self.pixels[y * SCRWIDTH + x] = value;
-    }
 }
