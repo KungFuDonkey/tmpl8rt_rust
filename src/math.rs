@@ -358,6 +358,19 @@ macro_rules! impl_single_assign_operator_2 {
     };
 }
 
+macro_rules! impl_single_operator_2_reversed {
+    ($type:ty, $subtype:ty, $trait:ty, $trait_t:ty, $trait_fn:ident) => {
+        impl $trait for $trait_t
+        {
+            type Output = $type;
+            fn $trait_fn(self, rhs: $type) -> Self::Output
+            {
+                <$type>::from_xy(rhs.x.$trait_fn(self as $subtype), rhs.y.$trait_fn(self as $subtype))
+            }
+        }
+    };
+}
+
 macro_rules! impl_operators_2 {
     ($type:ty, $subtype:ty) => {
 
@@ -382,10 +395,13 @@ macro_rules! impl_operators_2 {
         impl_default_operator_2!($type, Mul, mul);
         impl_default_assign_operator_2!($type, MulAssign, mul_assign);
         impl_single_operator_2!($type, $subtype, Mul<i32>, i32, mul);
+        impl_single_operator_2_reversed!($type, $subtype, Mul<$type>, i32, mul);
         impl_single_assign_operator_2!($type, $subtype, MulAssign<i32>, i32, mul_assign);
         impl_single_operator_2!($type, $subtype, Mul<u32>, u32, mul);
+        impl_single_operator_2_reversed!($type, $subtype, Mul<$type>, u32, mul);
         impl_single_assign_operator_2!($type, $subtype, MulAssign<u32>, u32, mul_assign);
         impl_single_operator_2!($type, $subtype, Mul<f32>, f32, mul);
+        impl_single_operator_2_reversed!($type, $subtype, Mul<$type>, f32, mul);
         impl_single_assign_operator_2!($type, $subtype, MulAssign<f32>, f32, mul_assign);
     };
 }
@@ -470,6 +486,19 @@ macro_rules! impl_single_assign_operator_3 {
     };
 }
 
+macro_rules! impl_single_operator_3_reversed {
+    ($type:ty, $subtype:ty, $trait:ty, $trait_t:ty, $trait_fn:ident) => {
+        impl $trait for $trait_t
+        {
+            type Output = $type;
+            fn $trait_fn(self, rhs: $type) -> Self::Output
+            {
+                <$type>::from_xyz(rhs.x.$trait_fn(self as $subtype), rhs.y.$trait_fn(self as $subtype), rhs.z.$trait_fn(self as $subtype))
+            }
+        }
+    };
+}
+
 macro_rules! impl_operators_3 {
     ($type:ty, $subtype:ty) => {
 
@@ -494,10 +523,13 @@ macro_rules! impl_operators_3 {
         impl_default_operator_3!($type, Mul, mul);
         impl_default_assign_operator_3!($type, MulAssign, mul_assign);
         impl_single_operator_3!($type, $subtype, Mul<i32>, i32, mul);
+        impl_single_operator_3_reversed!($type, $subtype, Mul<$type>, i32, mul);
         impl_single_assign_operator_3!($type, $subtype, MulAssign<i32>, i32, mul_assign);
         impl_single_operator_3!($type, $subtype, Mul<u32>, u32, mul);
+        impl_single_operator_3_reversed!($type, $subtype, Mul<$type>, u32, mul);
         impl_single_assign_operator_3!($type, $subtype, MulAssign<u32>, u32, mul_assign);
         impl_single_operator_3!($type, $subtype, Mul<f32>, f32, mul);
+        impl_single_operator_3_reversed!($type, $subtype, Mul<$type>, f32, mul);
         impl_single_assign_operator_3!($type, $subtype, MulAssign<f32>, f32, mul_assign);
     };
 }
@@ -583,6 +615,19 @@ macro_rules! impl_single_assign_operator_4 {
     };
 }
 
+macro_rules! impl_single_operator_4_reversed {
+    ($type:ty, $subtype:ty, $trait:ty, $trait_t:ty, $trait_fn:ident) => {
+        impl $trait for $trait_t
+        {
+            type Output = $type;
+            fn $trait_fn(self, rhs: $type) -> Self::Output
+            {
+                <$type>::from_xyzw(rhs.x.$trait_fn(self as $subtype), rhs.y.$trait_fn(self as $subtype), rhs.z.$trait_fn(self as $subtype), rhs.w.$trait_fn(self as $subtype))
+            }
+        }
+    };
+}
+
 macro_rules! impl_operators_4 {
     ($type:ty, $subtype:ty) => {
 
@@ -607,10 +652,13 @@ macro_rules! impl_operators_4 {
         impl_default_operator_4!($type, Mul, mul);
         impl_default_assign_operator_4!($type, MulAssign, mul_assign);
         impl_single_operator_4!($type, $subtype, Mul<i32>, i32, mul);
+        impl_single_operator_4_reversed!($type, $subtype, Mul<$type>, i32, mul);
         impl_single_assign_operator_4!($type, $subtype, MulAssign<i32>, i32, mul_assign);
         impl_single_operator_4!($type, $subtype, Mul<u32>, u32, mul);
+        impl_single_operator_4_reversed!($type, $subtype, Mul<$type>, u32, mul);
         impl_single_assign_operator_4!($type, $subtype, MulAssign<u32>, u32, mul_assign);
         impl_single_operator_4!($type, $subtype, Mul<f32>, f32, mul);
+        impl_single_operator_4_reversed!($type, $subtype, Mul<$type>, f32, mul);
         impl_single_assign_operator_4!($type, $subtype, MulAssign<f32>, f32, mul_assign);
     };
 }
@@ -637,6 +685,8 @@ impl_default_operator_4!(Float4, Div, div);
 impl_single_operator_4!(Float4, f32, Div<f32>, f32, div);
 impl_single_operator_4!(Int4, i32, Shl<i32>, i32, shl);
 impl_single_operator_4!(Int4, i32, Shr<i32>, i32, shr);
+
+
 
 pub fn min_f2(a: &Float2, b: &Float2 ) -> Float2
 {
