@@ -1,8 +1,7 @@
 
 extern crate gl;
 
-use std::ffi::{c_void, CStr, CString};
-use std::mem::size_of;
+use std::ffi::{c_void, CString};
 use std::ptr::null;
 use gl::types::*;
 use crate::surface::Surface;

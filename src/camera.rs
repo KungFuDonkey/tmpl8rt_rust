@@ -42,7 +42,7 @@ impl Camera
         let v = y / (SCRHEIGHT as f32);
         let p = self.top_left + (self.top_right - self.top_left) * u + (self.bottom_left - self.top_left) * v;
         let d = p - self.position;
-        return Ray::directed(self.position, normalize_f3(&d))
+        return Ray::directed(self.position, normalize(&d))
     }
 
     pub fn get_primary_ray_indexed(&self, index: usize) -> Ray
@@ -61,10 +61,10 @@ impl Camera
 
         let speed = 2.5 * delta_time;
         let dir = self.target - self.position;
-        let mut ahead = normalize_f3( &dir );
+        let mut ahead = normalize( &dir );
         let tmp_up = Float3::from_xyz(0.0, 1.0, 0.0);
-        let mut right = normalize_f3(&cross(&tmp_up, &ahead));
-        let mut up = normalize_f3(&cross( &ahead, &right ));
+        let mut right = normalize(&cross(&tmp_up, &ahead));
+        let mut up = normalize(&cross( &ahead, &right ));
         let mut changed = false;
 
         if input.is_key_down(glfw::Key::A)
@@ -125,9 +125,9 @@ impl Camera
             return;
         }
 
-        ahead = normalize_f3( &(self.target - self.position) );
-        up = normalize_f3( &cross( &ahead, &right ) );
-        right = normalize_f3( &cross( &up, &ahead ) );
+        ahead = normalize( &(self.target - self.position) );
+        up = normalize( &cross( &ahead, &right ) );
+        right = normalize( &cross( &up, &ahead ) );
         self.top_left = self.position + ahead * 2.0 - right * self.aspect_ratio  + up;
         self.top_right = self.position + ahead * 2.0  + right * self.aspect_ratio + up;
         self.bottom_left = self.position + ahead * 2.0 - right * self.aspect_ratio - up;

@@ -115,8 +115,8 @@ impl RayHittableObject for Sphere
 {
     fn intersect(&self, ray: &mut Ray) {
         let oc = ray.origin - self.position;
-        let b = dot_f3(&oc, &ray.direction);
-        let c = dot_f3(&oc, &oc) - self.radius2;
+        let b = dot(&oc, &ray.direction);
+        let c = dot(&oc, &oc) - self.radius2;
         let mut d = b * b - c;
         if d <= 0.0
         {
@@ -233,7 +233,7 @@ pub struct Plane
 impl RayHittableObject for Plane
 {
     fn intersect(&self, ray: &mut Ray) {
-        let t = -(dot_f3(&ray.origin, &self.normal) + self.distance) / (dot_f3(&ray.direction, &self.normal));
+        let t = -(dot(&ray.origin, &self.normal) + self.distance) / (dot(&ray.direction, &self.normal));
         if t < ray.t && t > 0.0
         {
             ray.t = t;
@@ -446,8 +446,8 @@ impl RayHittableObject for Torus
 
         // extension rays need double precision for the quadratic solver!
         let mut po = 1.0;
-        let mut m = dot_f3(&O, &O) as f64;
-        let mut k3 = dot_f3(&O, &D) as f64;
+        let mut m = dot(&O, &O) as f64;
+        let mut k3 = dot(&O, &D) as f64;
         let mut k32 = k3 * k3;
 
         // bounding sphere test
@@ -481,19 +481,19 @@ impl RayHittableObject for Torus
         c2 *= 0.33333333333;
         c1 *= 2.0;
         c0 *= 0.33333333333;
-        let mut Q = c2 * c2 + c0;
-        let mut R = 3.0 * c0 * c2 - c2 * c2 * c2 - c1 * c1;
-        let mut h = R * R - Q * Q * Q;
+        let mut q = c2 * c2 + c0;
+        let mut r = 3.0 * c0 * c2 - c2 * c2 * c2 - c1 * c1;
+        let mut h = r * r - q * q * q;
         let mut z: f64;
         if h < 0.0
         {
-            let mut sQ = Q.sqrt();
-            z = 2.0 * sQ * ((R / (sQ * Q)).acos() * 0.33333333333).cos();
+            let mut s_q = q.sqrt();
+            z = 2.0 * s_q * ((r / (s_q * q)).acos() * 0.33333333333).cos();
         }
         else
         {
-            let mut sQ = Torus::cbrt_fast(h.sqrt() + R.abs());
-            z = ( sQ + Q / sQ ).abs().copysign(R);
+            let mut s_q = Torus::cbrt_fast(h.sqrt() + r.abs());
+            z = ( s_q + q / s_q).abs().copysign(r);
         }
         z = c2 - z;
         let mut d1 = z - 3.0 * c2;
@@ -566,8 +566,8 @@ impl RayHittableObject for Torus
 
     fn get_normal(&self, i: &Float3) -> Float3 {
         let l = transform_position(&i, &self.inv_t);
-        let x = -Float3::from_xyz(1.0, 1.0, -1.0) * self.rc2 + l * (dot_f3(&l, &l) - self.rt2);
-        let n = normalize_f3(&x);
+        let x = -Float3::from_xyz(1.0, 1.0, -1.0) * self.rc2 + l * (dot(&l, &l) - self.rt2);
+        let n = normalize(&x);
         return transform_vector(&n, &self.t);
     }
 

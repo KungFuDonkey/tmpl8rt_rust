@@ -1,11 +1,9 @@
 
 use std::ops::{Deref};
-use rayon::prelude::*;
 use crate::camera::Camera;
 use crate::math::*;
-use crate::scene::{Ray, Scene};
-use crate::surface::*;
-use crate::timer::{FrameTimer, Timer};
+use crate::scene::{Scene};
+use crate::timer::{FrameTimer};
 use imgui_glfw_rs::imgui::Ui;
 use imgui_glfw_rs::imgui::ImString;
 use crate::input::Input;

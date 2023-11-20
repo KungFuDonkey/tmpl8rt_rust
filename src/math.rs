@@ -3,6 +3,7 @@
 use std::cmp::min;
 use std::cmp::max;
 use std::ops::*;
+use std::process::Output;
 
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy)]
@@ -212,14 +213,10 @@ impl Float4 {
     }
 }
 
-// swap
-pub fn swap<T>(a: &mut T, b: &mut T) {
-    core::mem::swap(a,b);
-}
-
 // random numbers
 static mut SEED: u32 = 0x12345678;
 
+#[inline(always)]
 fn wang_hash(s: u32) -> u32
 {
     let mut v = (s ^ 61) ^ (s >> 16);
@@ -230,11 +227,13 @@ fn wang_hash(s: u32) -> u32
     return v;
 }
 
+#[inline(always)]
 pub fn init_seed(seed_base: u32) -> u32
 {
     return wang_hash((seed_base + 1) * 17)
 }
 
+#[inline(always)]
 pub fn random_uint() -> u32
 {
     let v: u32 = 0;
@@ -246,6 +245,7 @@ pub fn random_uint() -> u32
     return v;
 }
 
+#[inline(always)]
 pub fn random_uint_s(seed: &mut u32) -> u32
 {
     *seed ^= *seed << 13;
@@ -254,16 +254,19 @@ pub fn random_uint_s(seed: &mut u32) -> u32
     return *seed;
 }
 
+#[inline(always)]
 pub fn random_float() -> f32
 {
     (random_uint() as f32) * 2.3283064365387e-10
 }
 
+#[inline(always)]
 pub fn random_float_s(seed: &mut u32) -> f32
 {
     (random_uint_s(seed) as f32) * 2.3283064365387e-10
 }
 
+#[inline(always)]
 pub fn rand(range: f32) -> f32
 {
     random_float() * range
@@ -288,6 +291,7 @@ static PRIMES: [[i32; 3]; 10] = [
     [ 997169939, 842027887, 423882827 ]
 ];
 
+#[inline(always)]
 pub fn noise(i: usize, x: i32, y: i32) -> f32
 {
     let mut n = x + y * 57;
@@ -310,6 +314,8 @@ macro_rules! impl_default_operator_2
         impl $trait for $type
         {
             type Output = $type;
+
+            #[inline(always)]
             fn $trait_fn(self, rhs: Self) -> Self::Output
             {
                 <$type>::from_xy(self.x.$trait_fn(rhs.x), self.y.$trait_fn(rhs.y))
@@ -323,6 +329,7 @@ macro_rules! impl_default_assign_operator_2
     ($type:ty, $trait:ty, $trait_fn:ident) => {
         impl $trait for $type
         {
+            #[inline(always)]
             fn $trait_fn(&mut self, rhs: Self)
             {
                 self.x.$trait_fn(rhs.x);
@@ -337,6 +344,8 @@ macro_rules! impl_single_operator_2 {
         impl $trait for $type
         {
             type Output = $type;
+
+            #[inline(always)]
             fn $trait_fn(self, rhs: $trait_t) -> Self::Output
             {
                 <$type>::from_xy(self.x.$trait_fn(rhs as $subtype), self.y.$trait_fn(rhs as $subtype))
@@ -349,6 +358,7 @@ macro_rules! impl_single_assign_operator_2 {
     ($type:ty, $subtype:ty, $trait:ty, $trait_t:ty, $trait_fn:ident) => {
         impl $trait for $type
         {
+            #[inline(always)]
             fn $trait_fn(&mut self, rhs: $trait_t)
             {
                 self.x.$trait_fn(rhs as $subtype);
@@ -363,6 +373,8 @@ macro_rules! impl_single_operator_2_reversed {
         impl $trait for $trait_t
         {
             type Output = $type;
+
+            #[inline(always)]
             fn $trait_fn(self, rhs: $type) -> Self::Output
             {
                 <$type>::from_xy(rhs.x.$trait_fn(self as $subtype), rhs.y.$trait_fn(self as $subtype))
@@ -412,6 +424,7 @@ macro_rules! impl_additional_operators_2 {
         {
             type Output = $type;
 
+            #[inline(always)]
             fn neg(self) -> Self::Output {
                 <$type>::from_xy(-self.x, -self.y)
             }
@@ -436,6 +449,7 @@ macro_rules! impl_default_operator_3
         impl $trait for $type
         {
             type Output = $type;
+            #[inline(always)]
             fn $trait_fn(self, rhs: Self) -> Self::Output
             {
                 <$type>::from_xyz(self.x.$trait_fn(rhs.x), self.y.$trait_fn(rhs.y), self.z.$trait_fn(rhs.z))
@@ -449,6 +463,7 @@ macro_rules! impl_default_assign_operator_3
     ($type:ty, $trait:ty, $trait_fn:ident) => {
         impl $trait for $type
         {
+            #[inline(always)]
             fn $trait_fn(&mut self, rhs: Self)
             {
                 self.x.$trait_fn(rhs.x);
@@ -464,6 +479,7 @@ macro_rules! impl_single_operator_3 {
         impl $trait for $type
         {
             type Output = $type;
+            #[inline(always)]
             fn $trait_fn(self, rhs: $trait_t) -> Self::Output
             {
                 <$type>::from_xyz(self.x.$trait_fn(rhs as $subtype), self.y.$trait_fn(rhs as $subtype), self.z.$trait_fn(rhs as $subtype))
@@ -476,6 +492,7 @@ macro_rules! impl_single_assign_operator_3 {
     ($type:ty, $subtype:ty, $trait:ty, $trait_t:ty, $trait_fn:ident) => {
         impl $trait for $type
         {
+            #[inline(always)]
             fn $trait_fn(&mut self, rhs: $trait_t)
             {
                 self.x.$trait_fn(rhs as $subtype);
@@ -491,6 +508,7 @@ macro_rules! impl_single_operator_3_reversed {
         impl $trait for $trait_t
         {
             type Output = $type;
+            #[inline(always)]
             fn $trait_fn(self, rhs: $type) -> Self::Output
             {
                 <$type>::from_xyz(rhs.x.$trait_fn(self as $subtype), rhs.y.$trait_fn(self as $subtype), rhs.z.$trait_fn(self as $subtype))
@@ -540,6 +558,7 @@ macro_rules! impl_additional_operators_3 {
         {
             type Output = $type;
 
+            #[inline(always)]
             fn neg(self) -> Self::Output {
                 <$type>::from_xyz(-self.x, -self.y, -self.z)
             }
@@ -563,6 +582,7 @@ macro_rules! impl_default_operator_4
         impl $trait for $type
         {
             type Output = $type;
+            #[inline(always)]
             fn $trait_fn(self, rhs: Self) -> Self::Output
             {
                 <$type>::from_xyzw(self.x.$trait_fn(rhs.x), self.y.$trait_fn(rhs.y), self.z.$trait_fn(rhs.z), self.w.$trait_fn(rhs.w))
@@ -576,6 +596,7 @@ macro_rules! impl_default_assign_operator_4
     ($type:ty, $trait:ty, $trait_fn:ident) => {
         impl $trait for $type
         {
+            #[inline(always)]
             fn $trait_fn(&mut self, rhs: Self)
             {
                 self.x.$trait_fn(rhs.x);
@@ -592,6 +613,7 @@ macro_rules! impl_single_operator_4 {
         impl $trait for $type
         {
             type Output = $type;
+            #[inline(always)]
             fn $trait_fn(self, rhs: $trait_t) -> Self::Output
             {
                 <$type>::from_xyzw(self.x.$trait_fn(rhs as $subtype), self.y.$trait_fn(rhs as $subtype), self.z.$trait_fn(rhs as $subtype), self.w.$trait_fn(rhs as $subtype))
@@ -604,6 +626,7 @@ macro_rules! impl_single_assign_operator_4 {
     ($type:ty, $subtype:ty, $trait:ty, $trait_t:ty, $trait_fn:ident) => {
         impl $trait for $type
         {
+            #[inline(always)]
             fn $trait_fn(&mut self, rhs: $trait_t)
             {
                 self.x.$trait_fn(rhs as $subtype);
@@ -620,6 +643,7 @@ macro_rules! impl_single_operator_4_reversed {
         impl $trait for $trait_t
         {
             type Output = $type;
+            #[inline(always)]
             fn $trait_fn(self, rhs: $type) -> Self::Output
             {
                 <$type>::from_xyzw(rhs.x.$trait_fn(self as $subtype), rhs.y.$trait_fn(self as $subtype), rhs.z.$trait_fn(self as $subtype), rhs.w.$trait_fn(self as $subtype))
@@ -686,291 +710,586 @@ impl_single_operator_4!(Float4, f32, Div<f32>, f32, div);
 impl_single_operator_4!(Int4, i32, Shl<i32>, i32, shl);
 impl_single_operator_4!(Int4, i32, Shr<i32>, i32, shr);
 
-
-
-pub fn min_f2(a: &Float2, b: &Float2 ) -> Float2
+pub trait VectorMinMax
 {
-    return Float2::from_xy( a.x.min(b.x) , a.y.min(b.y) );
+
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self;
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self;
+
 }
 
-pub fn min_f3(a: &Float3, b: &Float3 ) -> Float3
+impl VectorMinMax for Float2
 {
-    return Float3::from_xyz( a.x.min(b.x), a.y.min(b.y), a.z.min( b.z ) );
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self {
+        Self::from_xy( self.x.min(rhs.x) , self.y.min(rhs.y) )
+    }
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self {
+        Self::from_xy( self.x.max( rhs.x ), self.y.max( rhs.y ) )
+    }
 }
 
-pub fn min_f4(a: &Float4, b: &Float4 ) -> Float4
+impl VectorMinMax for Float3
 {
-    return Float4::from_xyzw( a.x.min(b.x), a.y.min(b.y), a.z.min( b.z ) , a.w.min( b.w ) )
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self {
+        Self::from_xyz( self.x.min(rhs.x), self.y.min(rhs.y), self.z.min( rhs.z ) )
+    }
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self {
+        Self::from_xyz( self.x.max( rhs.x ), self.y.max( rhs.y ) , self.z.max( rhs.z ) )
+    }
 }
 
-pub fn min_i2(a: &Int2, b: &Int2 ) -> Int2
+impl VectorMinMax for Float4
 {
-    return Int2::from_xy( min( a.x, b.x ), min( a.y, b.y ) );
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self {
+        Self::from_xyzw( self.x.min(rhs.x), self.y.min(rhs.y), self.z.min( rhs.z ) , self.w.min( rhs.w ) )
+    }
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self {
+        Self::from_xyzw( self.x.max( rhs.x ), self.y.max( rhs.y ) , self.z.max( rhs.z ) , self.w.max(rhs.w ) )
+    }
 }
 
-pub fn min_i3(a: &Int3, b: &Int3 ) -> Int3
+impl VectorMinMax for Int2
 {
-    return Int3::from_xyz( min( a.x, b.x ), min( a.y, b.y ), min( a.z, b.z ) );
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self {
+        Self::from_xy( self.x.min(rhs.x) , self.y.min(rhs.y) )
+    }
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self {
+        Self::from_xy( self.x.max( rhs.x ), self.y.max( rhs.y ) )
+    }
 }
 
-pub fn min_i4(a: &Int4, b: &Int4 ) -> Int4
+impl VectorMinMax for Int3
 {
-    return Int4::from_xyzw( min( a.x, b.x ), min( a.y, b.y ), min( a.z, b.z ), min( a.w, b.w ) )
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self {
+        Self::from_xyz( self.x.min(rhs.x), self.y.min(rhs.y), self.z.min( rhs.z ) )
+    }
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self {
+        Self::from_xyz( self.x.max( rhs.x ), self.y.max( rhs.y ) , self.z.max( rhs.z ) )
+    }
 }
 
-pub fn min_u2(a: &Uint2, b: &Uint2 ) -> Uint2
+impl VectorMinMax for Int4
 {
-    return Uint2::from_xy( min( a.x, b.x ), min( a.y, b.y ) );
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self {
+        Self::from_xyzw( self.x.min(rhs.x), self.y.min(rhs.y), self.z.min( rhs.z ) , self.w.min( rhs.w ) )
+    }
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self {
+        Self::from_xyzw( self.x.max( rhs.x ), self.y.max( rhs.y ) , self.z.max( rhs.z ) , self.w.max(rhs.w ) )
+    }
 }
 
-pub fn min_u3(a: &Uint3, b: &Uint3 ) -> Uint3
+impl VectorMinMax for Uint2
 {
-    return Uint3::from_xyz( min( a.x, b.x ), min( a.y, b.y ), min( a.z, b.z ) );
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self {
+        Self::from_xy( self.x.min(rhs.x) , self.y.min(rhs.y) )
+    }
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self {
+        Self::from_xy( self.x.max( rhs.x ), self.y.max( rhs.y ) )
+    }
 }
 
-pub fn min_u4(a: &Uint4, b: &Uint4 ) -> Uint4
+impl VectorMinMax for Uint3
 {
-    return Uint4::from_xyzw( min( a.x, b.x ), min( a.y, b.y ), min( a.z, b.z ), min( a.w, b.w ) )
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self {
+        Self::from_xyz( self.x.min(rhs.x), self.y.min(rhs.y), self.z.min( rhs.z ) )
+    }
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self {
+        Self::from_xyz( self.x.max( rhs.x ), self.y.max( rhs.y ) , self.z.max( rhs.z ) )
+    }
 }
 
-pub fn max_f2(a: &Float2, b: &Float2 ) -> Float2
+impl VectorMinMax for Uint4
 {
-    return Float2::from_xy( a.x.max( b.x ), a.y.max( b.y ) );
+    #[inline(always)]
+    fn min(&self, rhs: &Self) -> Self {
+        Self::from_xyzw( self.x.min(rhs.x), self.y.min(rhs.y), self.z.min( rhs.z ) , self.w.min( rhs.w ) )
+    }
+
+    #[inline(always)]
+    fn max(&self, rhs: &Self) -> Self {
+        Self::from_xyzw( self.x.max( rhs.x ), self.y.max( rhs.y ) , self.z.max( rhs.z ) , self.w.max(rhs.w ) )
+    }
 }
 
-pub fn max_f3(a: &Float3, b: &Float3 ) -> Float3
+pub trait Lerp<StepType>
 {
-    return Float3::from_xyz( a.x.max( b.x ), a.y.max( b.y ) , a.z.max( b.z ) );
+    fn lerp(a: &Self, b: &Self, t: StepType) -> Self;
 }
 
-pub fn max_f4(a: &Float4, b: &Float4 ) -> Float4
+impl Lerp<f32> for f32
 {
-    return Float4::from_xyzw( a.x.max( b.x ), a.y.max( b.y ) , a.z.max( b.z ) , a.w.max(b.w ) )
+    #[inline(always)]
+    fn lerp(a: &Self, b: &Self, t: f32) -> Self {
+        *a + t * (*b - *a)
+    }
 }
 
-pub fn max_i2(a: &Int2, b: &Int2 ) -> Int2
+impl Lerp<f32> for Float2
 {
-    return Int2::from_xy( max( a.x, b.x ), max( a.y, b.y ) );
+    #[inline(always)]
+    fn lerp(a: &Self, b: &Self, t: f32) -> Self {
+        *a + (*b - *a) * t
+    }
 }
 
-pub fn max_i3(a: &Int3, b: &Int3 ) -> Int3
+impl Lerp<f32> for Float3
 {
-    return Int3::from_xyz( max( a.x, b.x ), max( a.y, b.y ), max( a.z, b.z ) );
+    #[inline(always)]
+    fn lerp(a: &Self, b: &Self, t: f32) -> Self {
+        *a + (*b - *a) * t
+    }
 }
 
-pub fn max_i4(a: &Int4, b: &Int4 ) -> Int4
+impl Lerp<f32> for Float4
 {
-    return Int4::from_xyzw( max( a.x, b.x ), max( a.y, b.y ), max( a.z, b.z ), max( a.w, b.w ) )
+    #[inline(always)]
+    fn lerp(a: &Self, b: &Self, t: f32) -> Self {
+        *a + (*b - *a) * t
+    }
 }
 
-pub fn max_u2(a: &Uint2, b: &Uint2 ) -> Uint2
+#[inline(always)]
+pub fn lerp<T, StepType>(a: &T, b: &T, t: StepType) -> T
+where T: Lerp<StepType>
 {
-    return Uint2::from_xy( max( a.x, b.x ), max( a.y, b.y ) );
+    T::lerp(a, b, t)
 }
 
-pub fn max_u3(a: &Uint3, b: &Uint3 ) -> Uint3
+pub trait Clamp<DelimiterType>
 {
-    return Uint3::from_xyz( max( a.x, b.x ), max( a.y, b.y ), max( a.z, b.z ) );
+    fn clamp(&self, a: DelimiterType, b: DelimiterType) -> Self;
 }
 
-pub fn max_u4(a: &Uint4, b: &Uint4 ) -> Uint4
+impl Clamp<f32> for f32
 {
-    return Uint4::from_xyzw( max( a.x, b.x ), max( a.y, b.y ), max( a.z, b.z ), max( a.w, b.w ) )
+    #[inline(always)]
+    fn clamp(&self, a: f32, b: f32) -> Self {
+        a.max(self.min( b ))
+    }
 }
 
-pub fn lerp(a: f32, b: f32, t: f32) -> f32
+impl Clamp<i32> for i32
 {
-    return a + t * (b - a);
+    #[inline(always)]
+    fn clamp(&self, a: i32, b: i32) -> Self
+    {
+        a.max((*self).min( b ))
+    }
 }
 
-pub fn lerp_f2(a: &Float2, b: &Float2, t: f32) -> Float2
+impl Clamp<u32> for u32
 {
-    return *a + (*b - *a) * t;
+    #[inline(always)]
+    fn clamp(&self, a: u32, b: u32) -> Self
+    {
+        a.max((*self).min( b ))
+    }
 }
 
-pub fn lerp_f3(a: &Float3, b: &Float3, t: f32) -> Float3
+impl Clamp<f32> for Float2
 {
-    return *a + (*b - *a) * t;
+    #[inline(always)]
+    fn clamp(&self, a: f32, b: f32) -> Self {
+        Float2::from_xy(self.x.clamp(a, b), self.y.clamp(a, b))
+    }
 }
 
-pub fn lerp_f4(a: &Float4, b: &Float4, t: f32) -> Float4
+impl Clamp<i32> for Int2
 {
-    return *a + (*b - *a) * t;
+    #[inline(always)]
+    fn clamp(&self, a: i32, b: i32) -> Self
+    {
+        Int2::from_xy(self.x.clamp(a, b), self.y.clamp(a, b))
+    }
 }
 
-pub fn clamp_f(f: f32, a: f32, b: f32) -> f32
+impl Clamp<u32> for Uint2
 {
-    return a.max(f.min( b ) );
+    #[inline(always)]
+    fn clamp(&self, a: u32, b: u32) -> Self
+    {
+        Uint2::from_xy(self.x.clamp(a, b), self.y.clamp(a, b))
+    }
 }
 
-pub fn clamp_i(f: i32, a: i32, b: i32) -> i32
+impl Clamp<f32> for Float3
 {
-    return max( a, min( f, b ) );
+    #[inline(always)]
+    fn clamp(&self, a: f32, b: f32) -> Self {
+        Float3::from_xyz(self.x.clamp(a, b), self.y.clamp(a, b), self.z.clamp(a, b))
+    }
 }
 
-pub fn clamp_u(f: u32, a: u32, b: u32) -> u32
+impl Clamp<i32> for Int3
 {
-    return max( a, min( f, b ) );
+    #[inline(always)]
+    fn clamp(&self, a: i32, b: i32) -> Self {
+        Int3::from_xyz(self.x.clamp(a, b), self.y.clamp(a, b), self.z.clamp(a, b))
+    }
 }
 
-pub fn clamp_f2(f: &Float2, a: f32, b: f32) -> Float2
+impl Clamp<u32> for Uint3
 {
-    return Float2::from_xy(clamp_f(f.x, a, b), clamp_f(f.y, a, b));
+    #[inline(always)]
+    fn clamp(&self, a: u32, b: u32) -> Self {
+        Uint3::from_xyz(self.x.clamp(a, b), self.y.clamp(a, b), self.z.clamp(a, b))
+    }
 }
 
-pub fn clamp_i2(f: &Int2, a: i32, b: i32) -> Int2
+impl Clamp<f32> for Float4
 {
-    return Int2::from_xy(clamp_i(f.x, a, b), clamp_i(f.y, a, b));
+    #[inline(always)]
+    fn clamp(&self, a: f32, b: f32) -> Self {
+        Float4::from_xyzw(self.x.clamp(a, b), self.y.clamp(a, b), self.z.clamp(a, b), self.w.clamp(a, b))
+    }
 }
 
-pub fn clamp_u2(f: &Uint2, a: u32, b: u32) -> Uint2
+impl Clamp<i32> for Int4
 {
-    return Uint2::from_xy(clamp_u(f.x, a, b), clamp_u(f.y, a, b));
+    #[inline(always)]
+    fn clamp(&self, a: i32, b: i32) -> Self {
+        Int4::from_xyzw(self.x.clamp(a, b), self.y.clamp(a, b), self.z.clamp(a, b), self.w.clamp(a, b))
+    }
 }
 
-pub fn clamp_f3(f: &Float3, a: f32, b: f32) -> Float3
+impl Clamp<u32> for Uint4
 {
-    return Float3::from_xyz(clamp_f(f.x, a, b), clamp_f(f.y, a, b), clamp_f(f.z, a, b));
+    #[inline(always)]
+    fn clamp(&self, a: u32, b: u32) -> Self {
+        Uint4::from_xyzw(self.x.clamp(a, b), self.y.clamp(a, b), self.z.clamp(a, b), self.w.clamp(a, b))
+    }
 }
 
-pub fn clamp_i3(f: &Int3, a: i32, b: i32) -> Int3
+pub trait VectorDot
 {
-    return Int3::from_xyz(clamp_i(f.x, a, b), clamp_i(f.y, a, b), clamp_i(f.z, a, b));
+    type Output;
+
+    fn dot(a: &Self, b: &Self) -> Self::Output;
 }
 
-pub fn clamp_u3(f: &Uint3, a: u32, b: u32) -> Uint3
+impl VectorDot for Float2
 {
-    return Uint3::from_xyz(clamp_u(f.x, a, b), clamp_u(f.y, a, b), clamp_u(f.z, a, b));
+    type Output = f32;
+
+    #[inline(always)]
+    fn dot(a: &Self, b: &Self) -> Self::Output {
+        a.x * b.x + a.y * b.y
+    }
 }
 
-pub fn clamp_f4(f: &Float4, a: f32, b: f32) -> Float4
+impl VectorDot for Float3
 {
-    return Float4::from_xyzw(clamp_f(f.x, a, b), clamp_f(f.y, a, b), clamp_f(f.z, a, b), clamp_f(f.w, a, b));
+    type Output = f32;
+
+    #[inline(always)]
+    fn dot(a: &Self, b: &Self) -> Self::Output {
+        a.x * b.x + a.y * b.y + a.z * b.z
+    }
 }
 
-pub fn clamp_i4(f: &Int4, a: i32, b: i32) -> Int4
+impl VectorDot for Float4
 {
-    return Int4::from_xyzw(clamp_i(f.x, a, b), clamp_i(f.y, a, b), clamp_i(f.z, a, b), clamp_i(f.w, a, b));
+    type Output = f32;
+
+    #[inline(always)]
+    fn dot(a: &Self, b: &Self) -> Self::Output {
+        a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w
+    }
 }
 
-pub fn clamp_u4(f: &Uint4, a: u32, b: u32) -> Uint4
+impl VectorDot for Int2
 {
-    return Uint4::from_xyzw(clamp_u(f.x, a, b), clamp_u(f.y, a, b), clamp_u(f.z, a, b), clamp_u(f.w, a, b));
+    type Output = i32;
+
+    #[inline(always)]
+    fn dot(a: &Self, b: &Self) -> Self::Output {
+        a.x * b.x + a.y * b.y
+    }
 }
 
-pub fn dot_f2 (a: &Float2, b: &Float2) -> f32
+impl VectorDot for Int3
 {
-    return a.x * b.x + a.y * b.y;
+    type Output = i32;
+
+    #[inline(always)]
+    fn dot(a: &Self, b: &Self) -> Self::Output {
+        a.x * b.x + a.y * b.y + a.z * b.z
+    }
 }
 
-pub fn dot_f3 (a: &Float3, b: &Float3) -> f32
+impl VectorDot for Int4
 {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
+    type Output = i32;
+
+    #[inline(always)]
+    fn dot(a: &Self, b: &Self) -> Self::Output {
+        a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w
+    }
 }
 
-pub fn dot_f4 (a: &Float4, b: &Float4) -> f32
+impl VectorDot for Uint2
 {
-    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+    type Output = u32;
+
+    #[inline(always)]
+    fn dot(a: &Self, b: &Self) -> Self::Output {
+        a.x * b.x + a.y * b.y
+    }
 }
 
-pub fn dot_i2 (a: &Int2, b: &Int2) -> i32
+impl VectorDot for Uint3
 {
-    return a.x * b.x + a.y * b.y;
+    type Output = u32;
+
+    #[inline(always)]
+    fn dot(a: &Self, b: &Self) -> Self::Output {
+        a.x * b.x + a.y * b.y + a.z * b.z
+    }
 }
 
-pub fn dot_i3 (a: &Int3, b: &Int3) -> i32
+impl VectorDot for Uint4
 {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
+    type Output = u32;
+
+    #[inline(always)]
+    fn dot(a: &Self, b: &Self) -> Self::Output {
+        a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w
+    }
 }
 
-pub fn dot_i4 (a: &Int4, b: &Int4) -> i32
+#[inline(always)]
+pub fn dot<T>(a: &T, b: &T) -> <T as VectorDot>::Output
+    where T: VectorDot
 {
-    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+    T::dot(a, b)
 }
 
-pub fn dot_u2 (a: &Uint2, b: &Uint2) -> u32
+pub trait VectorLength
 {
-    return a.x * b.x + a.y * b.y;
+    type SqrLengthOutput;
+
+    type LengthOutput;
+
+    fn sqr_length(&self) -> Self::SqrLengthOutput;
+
+    fn length(&self) -> Self::LengthOutput;
 }
 
-pub fn dot_u3 (a: &Uint3, b: &Uint3) -> u32
+impl VectorLength for Float2
 {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
+    type SqrLengthOutput = f32;
+    type LengthOutput = f32;
+
+    #[inline(always)]
+    fn sqr_length(&self) -> Self::SqrLengthOutput {
+        Self::dot(self, self)
+    }
+
+    #[inline(always)]
+    fn length(&self) -> Self::LengthOutput {
+        Self::dot(self, self).sqrt()
+    }
 }
 
-pub fn dot_u4 (a: &Uint4, b: &Uint4) -> u32
+impl VectorLength for Float3
 {
-    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+    type SqrLengthOutput = f32;
+    type LengthOutput = f32;
+
+    #[inline(always)]
+    fn sqr_length(&self) -> Self::SqrLengthOutput {
+        Self::dot(self, self)
+    }
+
+    #[inline(always)]
+    fn length(&self) -> Self::LengthOutput {
+        Self::dot(self, self).sqrt()
+    }
 }
 
-pub fn sqr_length_f2( v: &Float2) -> f32
+impl VectorLength for Float4
 {
-    return dot_f2(v, v);
+    type SqrLengthOutput = f32;
+    type LengthOutput = f32;
+
+    #[inline(always)]
+    fn sqr_length(&self) -> Self::SqrLengthOutput {
+        Self::dot(self, self)
+    }
+
+    #[inline(always)]
+    fn length(&self) -> Self::LengthOutput {
+        Self::dot(self, self).sqrt()
+    }
 }
 
-pub fn sqr_length_f3( v: &Float3) -> f32
+impl VectorLength for Int2
 {
-    return dot_f3(v, v);
+    type SqrLengthOutput = i32;
+    type LengthOutput = f32;
+
+    #[inline(always)]
+    fn sqr_length(&self) -> Self::SqrLengthOutput {
+        Self::dot(self, self)
+    }
+
+    #[inline(always)]
+    fn length(&self) -> Self::LengthOutput {
+        (Self::dot(self, self) as f32).sqrt()
+    }
 }
 
-pub fn sqr_length_f4( v: &Float4) -> f32
+impl VectorLength for Int3
 {
-    return dot_f4(v, v);
+    type SqrLengthOutput = i32;
+    type LengthOutput = f32;
+
+    #[inline(always)]
+    fn sqr_length(&self) -> Self::SqrLengthOutput {
+        Self::dot(self, self)
+    }
+
+    #[inline(always)]
+    fn length(&self) -> Self::LengthOutput {
+        (Self::dot(self, self) as f32).sqrt()
+    }
 }
 
-pub fn length_f2(v: &Float2) -> f32
+impl VectorLength for Int4
 {
-    return dot_f2(v,v).sqrt();
+    type SqrLengthOutput = i32;
+    type LengthOutput = f32;
+
+    #[inline(always)]
+    fn sqr_length(&self) -> Self::SqrLengthOutput {
+        Self::dot(self, self)
+    }
+
+    #[inline(always)]
+    fn length(&self) -> Self::LengthOutput {
+        (Self::dot(self, self) as f32).sqrt()
+    }
 }
 
-pub fn length_f3(v: &Float3) -> f32
+#[inline(always)]
+pub fn length<T>(a: &T) -> <T as VectorLength>::LengthOutput
+where T: VectorLength
 {
-    return dot_f3(v,v).sqrt();
+    a.length()
 }
 
-pub fn length_f4(v: &Float4) -> f32
+#[inline(always)]
+pub fn sqr_length<T>(a: &T) -> <T as VectorLength>::SqrLengthOutput
+    where T: VectorLength
 {
-    return dot_f4(v,v).sqrt();
+    a.sqr_length()
 }
 
-pub fn length_i2(v: &Int2) -> f32
+pub trait VectorNormalize
 {
-    return (dot_i2(v,v) as f32).sqrt();
+    #[inline(always)]
+    fn normalize(&self) -> Self;
 }
 
-pub fn length_i3(v: &Int3) -> f32
+impl VectorNormalize for Float2
 {
-    return (dot_i3(v,v) as f32).sqrt();
+    #[inline(always)]
+    fn normalize(&self) -> Self {
+        return *self * (1.0 / self.length())
+    }
 }
 
-pub fn length_i4(v: &Int4) -> f32
+impl VectorNormalize for Float3
 {
-    return (dot_i4(v,v) as f32).sqrt();
+    #[inline(always)]
+    fn normalize(&self) -> Self {
+        return *self * (1.0 / self.length())
+    }
 }
 
-pub fn normalize_f2(v: &Float2) -> Float2
+impl VectorNormalize for Float4
 {
-    return *v * (1.0 / length_f2(v));
+    #[inline(always)]
+    fn normalize(&self) -> Self {
+        return *self * (1.0 / self.length())
+    }
 }
 
-pub fn normalize_f3(v: &Float3) -> Float3
+#[inline(always)]
+pub fn normalize<T>(a: &T) -> T
+    where T: VectorNormalize
 {
-    return *v * (1.0 / length_f3(v));
+    a.normalize()
 }
 
-pub fn normalize_f4(v: &Float4) -> Float4
+pub trait VectorReflect
 {
-    return *v * (1.0 / length_f4(v));
+    #[inline(always)]
+    fn reflect(&self, n: &Self) -> Self;
 }
 
-pub fn reflect(i: &Float3, n: &Float3) -> Float3
+
+impl VectorReflect for Float3
 {
-    return *i - *n * dot_f3( n, i ) * 2.0;
+    #[inline(always)]
+    fn reflect(&self, n: &Self) -> Self {
+        *self - *n * Self::dot(self, n) * 2.0
+    }
 }
 
-pub fn cross(a: &Float3, b: &Float3) -> Float3
+#[inline(always)]
+pub fn reflect<T>(a: &T, b: &T) -> T
+    where T: VectorReflect
 {
-    return Float3::from_xyz( a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x );
+    T::reflect(a, b)
+}
+
+pub trait VectorCross
+{
+    #[inline(always)]
+    fn cross(a: &Self, b: &Self) -> Self;
+}
+
+impl VectorCross for Float3
+{
+    #[inline(always)]
+    fn cross(a: &Self, b: &Self) -> Self {
+        Float3::from_xyz( a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x )
+    }
+}
+
+#[inline(always)]
+pub fn cross<T>(a: &T, b: &T) -> T
+    where T: VectorCross
+{
+    T::cross(a, b)
 }
 
 #[repr(C, align(64))]
@@ -982,21 +1301,25 @@ pub struct Mat4
 
 impl Mat4
 {
+    #[inline(always)]
     pub fn identity_matrix() -> Self
     {
         Mat4 { cell: [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] }
     }
 
+    #[inline(always)]
     pub fn zero_matrix() -> Self
     {
         Mat4 { cell: [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ] }
     }
 
+    #[inline(always)]
     pub fn get_translation(&self) -> Float3
     {
         Float3::from_xyz(self.cell[3], self.cell[7], self.cell[11])
     }
 
+    #[inline(always)]
     pub fn rotate_x(a: f32) -> Self
     {
         let mut r = Mat4::identity_matrix();
@@ -1009,6 +1332,7 @@ impl Mat4
         return r;
     }
 
+    #[inline(always)]
     pub fn rotate_y(a: f32) -> Self
     {
         let mut r = Mat4::identity_matrix();
@@ -1021,6 +1345,7 @@ impl Mat4
         return r;
     }
 
+    #[inline(always)]
     pub fn rotate_z(a: f32) -> Self
     {
         let mut r = Mat4::identity_matrix();
@@ -1033,6 +1358,7 @@ impl Mat4
         return r;
     }
 
+    #[inline(always)]
     pub fn translate(p: &Float3) -> Self
     {
         let mut ret_val = Mat4::identity_matrix();
@@ -1042,6 +1368,7 @@ impl Mat4
         return ret_val;
     }
 
+    #[inline(always)]
     pub fn inverted(&self) -> Mat4
     {
         let inv = [
@@ -1091,6 +1418,7 @@ impl Mat4
         return ret_val;
     }
 
+    #[inline(always)]
     pub fn inverted_no_scale(&self) -> Mat4
     {
         let mut r = Mat4::identity_matrix();
@@ -1114,6 +1442,7 @@ impl Mul<&Mat4> for Float4
 {
     type Output = Float4;
 
+    #[inline(always)]
     fn mul(self, rhs: &Mat4) -> Self::Output {
         Float4::from_xyzw(
             rhs.cell[0] * self.x + rhs.cell[1] * self.y + rhs.cell[2] * self.z + rhs.cell[3] * self.w,
@@ -1128,6 +1457,7 @@ impl Mul<&Mat4> for Mat4
 {
     type Output = Mat4;
 
+    #[inline(always)]
     fn mul(self, rhs: &Mat4) -> Self::Output {
         let mut r = Mat4::identity_matrix();
         for i in (0..16).step_by(4) {
@@ -1152,18 +1482,21 @@ impl Mul<Mat4> for Mat4
     }
 }
 
+#[inline(always)]
 pub fn transform_position(a: &Float3, m: &Mat4) -> Float3
 {
     let f4 = Float4::from_xyzw(a.x, a.y, a.z, 1.0) * m;
     Float3::from_xyz(f4.x, f4.y, f4.z)
 }
 
+#[inline(always)]
 pub fn transform_vector(a: &Float3, m: &Mat4) -> Float3
 {
     let f4 = Float4::from_xyzw(a.x, a.y, a.z, 0.0) * m;
     Float3::from_xyz(f4.x, f4.y, f4.z)
 }
 
+#[inline(always)]
 pub fn rgbf32_to_rgb8_f4(value: &Float4) -> u32
 {
     let r: u32 = (255.0 * value.x.min(1.0)) as u32;
@@ -1172,6 +1505,7 @@ pub fn rgbf32_to_rgb8_f4(value: &Float4) -> u32
     return (r << 16) + (g << 8) + b;
 }
 
+#[inline(always)]
 pub fn rgbf32_to_rgb8_f3(value: &Float3) -> u32
 {
     let r: u32 = (255.0 * value.x.min(1.0)) as u32;
