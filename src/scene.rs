@@ -9,7 +9,8 @@ pub enum RayHittableObjectType
     Sphere,
     Plane,
     Cube,
-    Torus
+    Torus,
+    Quad
 }
 
 #[repr(C, align(64))]
@@ -376,6 +377,61 @@ impl Cube
     }
 }
 
+pub struct Quad
+{
+    pub size: f32,
+    pub t: Mat4,
+    pub inv_t: Mat4,
+    pub obj_idx: i32,
+    pub mat_idx: i32,
+}
+
+impl Quad
+{
+    pub fn new(obj_idx: i32, mat_idx: i32, size: f32, transform: &Mat4) -> Quad
+    {
+        Quad{
+            obj_idx,
+            mat_idx,
+            size: size * 0.5,
+            t: transform.clone(),
+            inv_t: transform.inverted_no_scale()
+        }
+    }
+}
+
+impl RayHittableObject for Quad
+{
+    fn intersect(&self, ray: &mut Ray) {
+        let Oy: f32 = self.inv_t.cell[4] * ray.origin.x + self.inv_t.cell[5] * ray.origin.y + self.inv_t.cell[6] * ray.origin.z + self.inv_t.cell[7];
+        let Dy: f32 = self.inv_t.cell[4] * ray.direction.x + self.inv_t.cell[5] * ray.direction.y + self.inv_t.cell[6] * ray.direction.z;
+        let t = Oy / -Dy;
+        if t < ray.t && t > 0.0
+        {
+            let Ox: f32 = self.inv_t.cell[0] * ray.origin.x + self.inv_t.cell[1] * ray.origin.y + self.inv_t.cell[2] * ray.origin.z + self.inv_t.cell[3];
+            let Oz: f32 = self.inv_t.cell[8] * ray.origin.x + self.inv_t.cell[9] * ray.origin.y + self.inv_t.cell[10] * ray.origin.z + self.inv_t.cell[11];
+            let Dx: f32 = self.inv_t.cell[0] * ray.direction.x + self.inv_t.cell[1] * ray.direction.y + self.inv_t.cell[2] * ray.direction.z;
+            let Dz: f32 = self.inv_t.cell[8] * ray.direction.x + self.inv_t.cell[9] * ray.direction.y + self.inv_t.cell[10] * ray.direction.z;
+            let Ix = Ox + t * Dx;
+            let Iz = Oz + t * Dz;
+            if Ix > -self.size && Ix < self.size && Iz > -self.size && Iz < self.size
+            {
+                ray.t = t;
+                ray.obj_idx = self.obj_idx;
+                ray.obj_type = RayHittableObjectType::Quad
+            }
+        }
+    }
+
+    fn get_normal(&self, i: &Float3) -> Float3 {
+        Float3::from_xyz(-self.t.cell[1], -self.t.cell[5], -self.t.cell[9])
+    }
+
+    fn get_uv(&self, i: &Float3) -> Float2 {
+        Float2::zero()
+    }
+}
+
 pub struct Torus
 {
     pub rt2: f32,
@@ -550,10 +606,10 @@ impl RayHittableObject for Torus
     }
 
     fn get_normal(&self, i: &Float3) -> Float3 {
-        let l = transform_position(&i, &self.inv_t);
-        let x = -Float3::from_xyz(1.0, 1.0, -1.0) * self.rc2 + l * (dot(&l, &l) - self.rt2);
-        let n = normalize(&x);
-        return transform_vector(&n, &self.t);
+        let l = transform_position(&i, &self.inv_t );
+        let x = l * (- self.rc2 * Float3::from_xyz(1.0, 1.0, -1.0 ) + dot(&l, &l) - self.rt2);
+        let n = normalize( &x );
+        return transform_vector(&n, &self.t );
     }
 
     fn get_uv(&self, i: &Float3) -> Float2 {
@@ -568,6 +624,7 @@ pub struct Scene
     planes: Vec<Plane>,
     cubes: Vec<Cube>,
     tori: Vec<Torus>,
+    quads: Vec<Quad>,
     materials: Vec<Box<dyn Material + Sync>>,
     animation_time: f32,
 }
@@ -600,13 +657,20 @@ impl Scene
             tori: vec![
                 torus
             ],
+            quads: vec![
+                Quad::new(0, 6, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, -1.0))),
+                Quad::new(1, 6, 0.5, &Mat4::translate(&Float3::from_xyz(1.0, 1.5, -1.0))),
+                Quad::new(2, 6, 0.5, &Mat4::translate(&Float3::from_xyz(1.0, 1.5, 1.0))),
+                Quad::new(3, 6, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, 1.0))),
+            ],
             materials: vec![
                 Box::new(LinearColorMaterial::new(Float3::from_a(1.0))),
                 Box::new(LinearColorMaterial::new(Float3::from_a(0.93))),
                 Box::new(CheckerBoardMaterial::new()),
                 Box::new(LogoMaterial::new()),
                 Box::new(RedMaterial::new()),
-                Box::new(BlueMaterial::new())
+                Box::new(BlueMaterial::new()),
+                Box::new(LinearColorMaterial::new(Float3::from_xyz(1.0, 0.0, 0.0))),
             ],
             animation_time: 0.0
         }
@@ -632,6 +696,11 @@ impl Scene
         for torus in &self.tori
         {
             torus.intersect(ray);
+        }
+
+        for quad in &self.quads
+        {
+            quad.intersect(ray);
         }
     }
 
@@ -666,6 +735,10 @@ impl Scene
             RayHittableObjectType::Torus =>
             {
                 self.tori[obj_idx as usize].get_normal(i)
+            },
+            RayHittableObjectType::Quad =>
+            {
+                self.quads[obj_idx as usize].get_normal(i)
             }
         };
 
@@ -688,17 +761,22 @@ impl Scene
             {
                 let s = &self.spheres[obj_idx as usize];
                 (s.get_uv(i), s.mat_idx)
-            }
+            },
             RayHittableObjectType::Plane =>
             {
                 let p = &self.planes[obj_idx as usize];
                 (p.get_uv(i), p.mat_idx)
-            }
+            },
             RayHittableObjectType::Cube =>
             {
                 let c = &self.cubes[obj_idx as usize];
                 (c.get_uv(i), c.mat_idx)
-            }
+            },
+            RayHittableObjectType::Quad =>
+            {
+                let q = &self.quads[obj_idx as usize];
+                (q.get_uv(i), q.mat_idx)
+            },
             RayHittableObjectType::Torus =>
             {
                 let t = &self.tori[obj_idx as usize];
