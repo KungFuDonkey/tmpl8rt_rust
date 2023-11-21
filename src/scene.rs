@@ -447,6 +447,17 @@ impl Quad
         let corner3 = transform_position(&Float3::from_xyz(-size, 0.0, size), &self.t);
         return corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1);
     }
+
+    pub fn center_point(&self) -> Float3
+    {
+        let r1 = 0.5;
+        let r2 = 0.5;
+        let size = self.size;
+        let corner1 = transform_position(&Float3::from_xyz(-size, 0.0, -size), &self.t);
+        let corner2 = transform_position(&Float3::from_xyz(size, 0.0, -size), &self.t);
+        let corner3 = transform_position(&Float3::from_xyz(-size, 0.0, size), &self.t);
+        return corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1);
+    }
 }
 
 impl RayHittableObject for Quad
@@ -934,7 +945,7 @@ impl Scene
         return false;
     }
 
-    pub fn direct_lighting(&self, point: &Float3, normal: &Float3, seed: &mut u32) -> f32
+    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, seed: &mut u32) -> f32
     {
         let total_sample_points = (self.quads.len() as u32) * QUAD_SAMPLE_SIZE;
         let sample_strength = 1.0 / (total_sample_points as f32);
@@ -956,6 +967,31 @@ impl Scene
                 // take distance to the light?
                 lighting += sample_strength * dot(&ray_dir_n, &normal);
             }
+        }
+
+        return lighting;
+    }
+
+    pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3) -> f32
+    {
+        let total_sample_points = (self.quads.len() as u32);
+        let light_strength = 1.0 / (total_sample_points as f32);
+        let mut lighting = 0.0;
+        for quad in &self.quads
+        {
+            let light_point = quad.center_point();
+            let ray_dir = light_point - *point;
+            let ray_dir_n = normalize(&ray_dir);
+            let origin = (*point) + (0.01 * ray_dir_n);
+            let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - 0.02);
+
+            if self.is_occluded(&ray)
+            {
+                continue;
+            }
+
+            // take distance to the light?
+            lighting += light_strength * dot(&ray_dir_n, &normal);
         }
 
         return lighting;

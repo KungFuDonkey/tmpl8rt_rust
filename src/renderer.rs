@@ -8,7 +8,8 @@ use rayon::prelude::*;
 pub enum RenderMode
 {
     Standard,
-    Shadows,
+    HardShadows,
+    SoftShadows,
     Normals,
     Distance
 }
@@ -73,7 +74,7 @@ impl Renderer
         return scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
     }
 
-    fn trace_shadow(ray: &mut Ray, scene: &Scene, seed: &mut u32) -> Float3
+    fn trace_soft_shadow(ray: &mut Ray, scene: &Scene, seed: &mut u32) -> Float3
     {
         scene.intersect_scene(ray);
         if ray.obj_idx == -1
@@ -83,14 +84,30 @@ impl Renderer
         let intersection = ray.intersection_point();
         let normal = scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
 
-        return scene.direct_lighting(&intersection, &normal, seed) * scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
+        return scene.direct_lighting_soft(&intersection, &normal, seed) * scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
+    }
+
+    fn trace_hard_shadow(ray: &mut Ray, scene: &Scene) -> Float3
+    {
+        scene.intersect_scene(ray);
+        if ray.obj_idx == -1
+        {
+            return Float3::zero();
+        }
+        let intersection = ray.intersection_point();
+        let normal = scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
+
+        return scene.direct_lighting_hard(&intersection, &normal) * scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
     }
 
     pub fn render(&mut self, scene: &Scene, camera: &Camera)
     {
-        for i in 0..(SCRWIDTH * SCRHEIGHT)
+        if self.render_mode == RenderMode::SoftShadows
         {
-            self.random_seeds[i] = random_uint_s(&mut self.seed);
+            for i in 0..(SCRWIDTH * SCRHEIGHT)
+            {
+                self.random_seeds[i] = random_uint_s(&mut self.seed);
+            }
         }
 
         match self.render_mode {
@@ -102,12 +119,20 @@ impl Renderer
                     *value = rgbf32_to_rgb8_f3(&ray_color);
                 });
             },
-            RenderMode::Shadows => {
+            RenderMode::SoftShadows => {
                 self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
                     {
                         let mut seed = self.random_seeds[index];
                         let mut ray = camera.get_primary_ray_indexed(index);
-                        let ray_color = Renderer::trace_shadow(&mut ray, &scene, &mut seed);
+                        let ray_color = Renderer::trace_soft_shadow(&mut ray, &scene, &mut seed);
+                        *value = rgbf32_to_rgb8_f3(&ray_color);
+                    });
+            },
+            RenderMode::HardShadows => {
+                self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                    {
+                        let mut ray = camera.get_primary_ray_indexed(index);
+                        let ray_color = Renderer::trace_hard_shadow(&mut ray, &scene);
                         *value = rgbf32_to_rgb8_f3(&ray_color);
                     });
             },

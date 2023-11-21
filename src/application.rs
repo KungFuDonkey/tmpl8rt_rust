@@ -58,7 +58,8 @@ impl Application
         ui.checkbox(ImString::new("Animate scene").deref(), &mut self.animating);
         ui.text(ImString::new("Render mode:").deref());
         ui.radio_button(ImString::new("Ray tracing").deref(), &mut self.renderer.render_mode, RenderMode::Standard);
-        ui.radio_button(ImString::new("Ray tracing + Shadows").deref(), &mut self.renderer.render_mode, RenderMode::Shadows);
+        ui.radio_button(ImString::new("Ray tracing + Hard Shadows").deref(), &mut self.renderer.render_mode, RenderMode::HardShadows);
+        ui.radio_button(ImString::new("Ray tracing + Soft Shadows").deref(), &mut self.renderer.render_mode, RenderMode::SoftShadows);
         ui.radio_button(ImString::new("Normals").deref(), &mut self.renderer.render_mode, RenderMode::Normals);
         ui.radio_button(ImString::new("Distance").deref(), &mut self.renderer.render_mode, RenderMode::Distance);
     }
