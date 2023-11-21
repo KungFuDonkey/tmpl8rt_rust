@@ -8,6 +8,7 @@ use rayon::prelude::*;
 pub enum RenderMode
 {
     Standard,
+    Shadows,
     Normals,
     Distance
 }
@@ -15,18 +16,25 @@ pub enum RenderMode
 pub struct Renderer
 {
     //accumulator: Vec<Float4>,
+    pub random_seeds: Vec<u32>,
     pub render_target: Surface,
     pub render_mode: RenderMode,
+    seed: u32
 }
 
 impl Renderer
 {
     pub fn new() -> Renderer
     {
+        let seed_base: u32 = 0x123456;
+        let mut seed = init_seed(seed_base);
+
         Renderer{
             //accumulator: vec![Float4::zero(); SCRWIDTH * SCRHEIGHT],
+            random_seeds: vec![0; SCRWIDTH * SCRHEIGHT],
             render_target: Surface::new(),
-            render_mode: RenderMode::Standard
+            render_mode: RenderMode::Standard,
+            seed
         }
     }
 
@@ -61,13 +69,30 @@ impl Renderer
             return Float3::zero();
         }
         let intersection = ray.intersection_point();
-        let normal = scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
 
         return scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
     }
 
+    fn trace_shadow(ray: &mut Ray, scene: &Scene, seed: &mut u32) -> Float3
+    {
+        scene.intersect_scene(ray);
+        if ray.obj_idx == -1
+        {
+            return Float3::zero();
+        }
+        let intersection = ray.intersection_point();
+        let normal = scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
+
+        return scene.direct_lighting(&intersection, &normal, seed) * scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
+    }
+
     pub fn render(&mut self, scene: &Scene, camera: &Camera)
     {
+        for i in 0..(SCRWIDTH * SCRHEIGHT)
+        {
+            self.random_seeds[i] = random_uint_s(&mut self.seed);
+        }
+
         match self.render_mode {
             RenderMode::Standard => {
                 self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
@@ -76,6 +101,15 @@ impl Renderer
                     let ray_color = Renderer::trace(&mut ray, &scene);
                     *value = rgbf32_to_rgb8_f3(&ray_color);
                 });
+            },
+            RenderMode::Shadows => {
+                self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                    {
+                        let mut seed = self.random_seeds[index];
+                        let mut ray = camera.get_primary_ray_indexed(index);
+                        let ray_color = Renderer::trace_shadow(&mut ray, &scene, &mut seed);
+                        *value = rgbf32_to_rgb8_f3(&ray_color);
+                    });
             },
             RenderMode::Normals => {
                 self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|

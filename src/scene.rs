@@ -81,6 +81,8 @@ trait RayHittableObject
     fn get_normal(&self, i: &Float3) -> Float3;
 
     fn get_uv(&self, i: &Float3) -> Float2;
+
+    fn is_occluded(&self, ray: &Ray) -> bool;
 }
 
 trait RayOccluder
@@ -143,6 +145,21 @@ impl RayHittableObject for Sphere
     fn get_uv(&self, i: &Float3) -> Float2
     {
         Float2::zero()
+    }
+
+    fn is_occluded(&self, ray: &Ray) -> bool {
+        let oc = ray.origin - self.position;
+        let b = dot(&oc, &ray.direction);
+        let c = dot(&oc, &oc) - self.radius2;
+
+        let d = b * b - c;
+        if d <= 0.0
+        {
+            return false
+        }
+
+        let t = -b - d.sqrt();
+        return t < ray.t && t > 0.0;
     }
 }
 
@@ -236,6 +253,10 @@ impl RayHittableObject for Plane
     fn get_uv(&self, i: &Float3) -> Float2
     {
         return (self.uv_function.f)(i)
+    }
+
+    fn is_occluded(&self, ray: &Ray) -> bool {
+        return false;
     }
 }
 
@@ -358,6 +379,23 @@ impl RayHittableObject for Cube
     {
         Float2::zero()
     }
+
+    fn is_occluded(&self, ray: &Ray) -> bool {
+        let origin = transform_position(&ray.origin, &self.inv_m);
+        let direction = transform_vector(&ray.direction, &self.inv_m);
+        let rdx = 1.0 / direction.x;
+        let rdy = 1.0 / direction.y;
+        let rdz = 1.0 / direction.z;
+        let t1 = (self.b[0].x - origin.x) * rdx;
+        let t2 = (self.b[1].x - origin.x) * rdx;
+        let t3 = (self.b[0].y - origin.y) * rdy;
+        let t4 = (self.b[1].y - origin.y) * rdy;
+        let t5 = (self.b[0].z - origin.z) * rdz;
+        let t6 = (self.b[1].z - origin.z) * rdz;
+        let tmin = t1.min( t2 ).max( t3.min( t4 ) ).max( t5.min( t6 ) );
+        let tmax = t1.max( t2 ).min( t3.max( t4 ) ).min( t5.max( t6 ) );
+        return tmax > 0.0 && tmin < tmax && tmin < ray.t;
+    }
 }
 
 impl Cube
@@ -398,6 +436,17 @@ impl Quad
             inv_t: transform.inverted_no_scale()
         }
     }
+
+    pub fn random_point(&self, seed: &mut u32) -> Float3
+    {
+        let r1 = random_float_s(seed);
+        let r2 = random_float_s(seed);
+        let size = self.size;
+        let corner1 = transform_position(&Float3::from_xyz(-size, 0.0, -size), &self.t);
+        let corner2 = transform_position(&Float3::from_xyz(size, 0.0, -size), &self.t);
+        let corner3 = transform_position(&Float3::from_xyz(-size, 0.0, size), &self.t);
+        return corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1);
+    }
 }
 
 impl RayHittableObject for Quad
@@ -430,6 +479,24 @@ impl RayHittableObject for Quad
     fn get_uv(&self, i: &Float3) -> Float2 {
         Float2::zero()
     }
+
+    fn is_occluded(&self, ray: &Ray) -> bool {
+        let o_y: f32 = self.inv_t.cell[4] * ray.origin.x + self.inv_t.cell[5] * ray.origin.y + self.inv_t.cell[6] * ray.origin.z + self.inv_t.cell[7];
+        let d_y: f32 = self.inv_t.cell[4] * ray.direction.x + self.inv_t.cell[5] * ray.direction.y + self.inv_t.cell[6] * ray.direction.z;
+        let t = o_y / -d_y;
+        if t < ray.t && t > 0.0
+        {
+            let o_x: f32 = self.inv_t.cell[0] * ray.origin.x + self.inv_t.cell[1] * ray.origin.y + self.inv_t.cell[2] * ray.origin.z + self.inv_t.cell[3];
+            let o_z: f32 = self.inv_t.cell[8] * ray.origin.x + self.inv_t.cell[9] * ray.origin.y + self.inv_t.cell[10] * ray.origin.z + self.inv_t.cell[11];
+            let d_x: f32 = self.inv_t.cell[0] * ray.direction.x + self.inv_t.cell[1] * ray.direction.y + self.inv_t.cell[2] * ray.direction.z;
+            let d_z: f32 = self.inv_t.cell[8] * ray.direction.x + self.inv_t.cell[9] * ray.direction.y + self.inv_t.cell[10] * ray.direction.z;
+            let i_x = o_x + t * d_x;
+            let i_z = o_z + t * d_z;
+            return i_x > -self.size && i_x < self.size && i_z > -self.size && i_z < self.size;
+        }
+
+        return false;
+    }
 }
 
 pub struct Torus
@@ -460,6 +527,20 @@ impl Torus
     }
 
     fn cbrt_fast(n: f64) -> f64
+    {
+        let mut x1 = n / 10.0;
+        let mut x2 = 1.0;
+        let mut turn = 0;
+        while (x1 - x2).abs() > 0.00000001 && turn < 100
+        {
+            turn += 1;
+            x1 = x2;
+            x2 = (2.0 / 3.0 * x1) + (n / (3.0 * x1 * x1));
+        }
+        return x2;
+    }
+
+    fn cbrt_fast_f32(n: f32) -> f32
     {
         let mut x1 = n / 10.0;
         let mut x2 = 1.0;
@@ -615,6 +696,114 @@ impl RayHittableObject for Torus
     fn get_uv(&self, i: &Float3) -> Float2 {
         Float2::zero()
     }
+
+    fn is_occluded(&self, ray: &Ray) -> bool {
+        // via: https://www.shadertoy.com/view/4sBGDy
+        let origin = transform_position(&ray.origin, &self.inv_t );
+        let direction = transform_vector(&ray.direction, &self.inv_t );
+        let mut po = 1.0;
+        let mut m = dot(&origin, &origin);
+        let mut k3 = dot(&origin, &direction);
+        let mut k32 = k3 * k3;
+
+        let r2 = self.r2;
+        let rt2 = self.rt2;
+        let rc2 = self.rc2;
+
+        // bounding sphere test
+        let v = k32 - m + r2;
+        if v < 0.0
+        {
+            return false;
+        }
+
+        // setup torus intersection
+        let mut k = (m - rt2 - rc2) * 0.5;
+        let mut k2 = k32 + rc2 * direction.z * direction.z + k;
+        let mut k1 = k * k3 + rc2 * origin.z * direction.z;
+        let mut k0 = k * k + rc2 * origin.z * origin.z - rc2 * rt2;
+        // solve quadratic equation
+        if (k3 * (k32 - k2) + k1 ).abs() < 0.01
+        {
+            let temp = k1;
+            k1 = k3;
+            k3 = temp;
+            po = -1.0;
+            k0 = 1.0 / k0;
+            k1 = k1 * k0;
+            k2 = k2 * k0;
+            k3 = k3 * k0;
+            k32 = k3 * k3;
+        }
+        let mut c2 = 2.0 * k2 - 3.0 * k32;
+        let mut c1 = k3 * (k32 - k2) + k1;
+        let mut c0 = k3 * (k3 * (-3.0 * k32 + 4.0 * k2) - 8.0 * k1) + 4.0 * k0;
+        c2 *= 0.33333333333;
+        c1 *= 2.0;
+        c0 *= 0.33333333333;
+        let Q = c2 * c2 + c0;
+        let R = 3.0 * c0 * c2 - c2 * c2 * c2 - c1 * c1;
+        let mut h = R * R - Q * Q * Q;
+        let mut z: f32;
+        if h < 0.0
+        {
+            let s_q = Q.sqrt();
+            z = 2.0 * s_q * ((R / (s_q * Q)).acos() * 0.33333333333).cos();
+        }
+        else
+        {
+            let s_q = Torus::cbrt_fast_f32(h.sqrt() + R.abs());
+            z = ( s_q + Q / s_q).abs().copysign(R);
+        }
+        z = c2 - z;
+        let mut d1 = z - 3.0 * c2;
+        let mut d2 = z * z - 3.0 * c0;
+        if d1.abs() < 1.0e-4
+        {
+            if d2 < 0.0
+            {
+                return false;
+            }
+            d2 = d2.sqrt();
+        }
+        else
+        {
+            if d1 < 0.0
+            {
+                return false;
+            }
+            d1 = ( d1 * 0.5 ).sqrt();
+            d2 = c1 / d1;
+        }
+        let t = 1e20;
+        h = d1 * d1 - z + d2;
+        if h > 0.0
+        {
+            let mut t1 = -d1 - h.sqrt() - k3;
+            if po < 0.0
+            {
+                t1 = 2.0 / t1;
+            }
+            if t1 > 0.0 && t1 < ray.t
+            {
+                return true;
+            }
+        }
+        h = d1 * d1 - z - d2;
+        if h > 0.0
+        {
+            let mut t1 = d1 - h.sqrt() - k3;
+            if po < 0.0
+            {
+                t1 = 2.0 / t1;
+            }
+            if t1 > 0.0 && t1 < ray.t
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 
@@ -628,6 +817,8 @@ pub struct Scene
     materials: Vec<Box<dyn Material + Sync>>,
     animation_time: f32,
 }
+
+const QUAD_SAMPLE_SIZE: u32 = 1;
 
 impl Scene
 {
@@ -702,6 +893,72 @@ impl Scene
         {
             quad.intersect(ray);
         }
+    }
+
+    pub fn is_occluded(&self, ray: &Ray) -> bool
+    {
+        for sphere in &self.spheres
+        {
+            if sphere.is_occluded(ray)
+            {
+                return true;
+            }
+        }
+
+        // skip planes
+
+        for cube in &self.cubes
+        {
+            if cube.is_occluded(ray)
+            {
+                return true;
+            }
+        }
+
+        for quad in &self.quads
+        {
+            if quad.is_occluded(ray)
+            {
+                return true;
+            }
+        }
+
+        for torus in &self.tori
+        {
+            if torus.is_occluded(ray)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    pub fn direct_lighting(&self, point: &Float3, normal: &Float3, seed: &mut u32) -> f32
+    {
+        let total_sample_points = (self.quads.len() as u32) * QUAD_SAMPLE_SIZE;
+        let sample_strength = 1.0 / (total_sample_points as f32);
+        let mut lighting = 0.0;
+        for quad in &self.quads
+        {
+            for _ in 0..QUAD_SAMPLE_SIZE
+            {
+                let light_point = quad.random_point(seed);
+                let ray_dir = light_point - *point;
+                let ray_dir_n = normalize(&ray_dir);
+                let ray = Ray::directed_distance(*point, ray_dir_n, length(&ray_dir) - 0.1);
+
+                if self.is_occluded(&ray)
+                {
+                    continue;
+                }
+
+                // take distance to the light?
+                lighting += sample_strength * dot(&ray_dir_n, &normal);
+            }
+        }
+
+        return lighting;
     }
 
 

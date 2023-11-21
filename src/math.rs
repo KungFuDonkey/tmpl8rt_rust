@@ -215,12 +215,12 @@ static mut SEED: u32 = 0x12345678;
 #[inline(always)]
 fn wang_hash(s: u32) -> u32
 {
-    let mut v = (s ^ 61) ^ (s >> 16);
+    let mut v: u128 = ((s ^ 61) ^ (s >> 16)) as u128;
     v *= 9;
     v = v ^ (v >> 4);
     v *= 0x27d4eb2d;
     v = v ^ (v >> 15);
-    return v;
+    return v as u32;
 }
 
 #[inline(always)]
