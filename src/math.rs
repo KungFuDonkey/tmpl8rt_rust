@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 use std::ops::*;
 
+pub const EPSILON: f32 = 0.00005;
+
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy)]
 pub struct Int2 {

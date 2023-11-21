@@ -842,7 +842,7 @@ impl Scene
 
         Scene{
             spheres: vec![
-                Sphere::new(0, 0, Float3::from_a(0.0), 0.6),
+                Sphere::new(0, 0, Float3::from_a(0.0), 0.3),
                 Sphere::new(1, 0, Float3::from_xyz( 0.0, 2.5, -3.07 ), 8.0)
             ],
             planes: vec![
@@ -861,9 +861,9 @@ impl Scene
             ],
             quads: vec![
                 Quad::new(0, 6, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, -1.0))),
-                Quad::new(1, 6, 0.5, &Mat4::translate(&Float3::from_xyz(1.0, 1.5, -1.0))),
-                Quad::new(2, 6, 0.5, &Mat4::translate(&Float3::from_xyz(1.0, 1.5, 1.0))),
-                Quad::new(3, 6, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, 1.0))),
+                Quad::new(1, 7, 0.5, &Mat4::translate(&Float3::from_xyz(1.0, 1.5, -1.0))),
+                Quad::new(2, 8, 0.5, &Mat4::translate(&Float3::from_xyz(1.0, 1.5, 1.0))),
+                Quad::new(3, 0, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, 1.0))),
             ],
             materials: vec![
                 Box::new(LinearColorMaterial::new(Float3::from_a(1.0))),
@@ -873,6 +873,8 @@ impl Scene
                 Box::new(RedMaterial::new()),
                 Box::new(BlueMaterial::new()),
                 Box::new(LinearColorMaterial::new(Float3::from_xyz(1.0, 0.0, 0.0))),
+                Box::new(LinearColorMaterial::new(Float3::from_xyz(0.0, 1.0, 0.0))),
+                Box::new(LinearColorMaterial::new(Float3::from_xyz(0.0, 0.0, 1.0))),
             ],
             animation_time: 0.0
         }
@@ -945,11 +947,11 @@ impl Scene
         return false;
     }
 
-    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, seed: &mut u32) -> f32
+    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, seed: &mut u32) -> Float3
     {
         let total_sample_points = (self.quads.len() as u32) * QUAD_SAMPLE_SIZE;
         let sample_strength = 1.0 / (total_sample_points as f32);
-        let mut lighting = 0.0;
+        let mut lighting = Float3::zero();
         for quad in &self.quads
         {
             for _ in 0..QUAD_SAMPLE_SIZE
@@ -957,41 +959,46 @@ impl Scene
                 let light_point = quad.random_point(seed);
                 let ray_dir = light_point - *point;
                 let ray_dir_n = normalize(&ray_dir);
-                let ray = Ray::directed_distance(*point, ray_dir_n, length(&ray_dir) - 0.1);
+                let origin = (*point) + (EPSILON * ray_dir_n);
+                let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
 
                 if self.is_occluded(&ray)
                 {
                     continue;
                 }
 
+                let light_uv = quad.get_uv(&light_point);
+                let light_color = self.materials[quad.mat_idx as usize].get_color(&light_uv);
                 // take distance to the light?
-                lighting += sample_strength * dot(&ray_dir_n, &normal);
+                lighting += sample_strength * dot(&ray_dir_n, &normal) * light_color;
             }
         }
 
         return lighting;
     }
 
-    pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3) -> f32
+    pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3) -> Float3
     {
         let total_sample_points = (self.quads.len() as u32);
         let light_strength = 1.0 / (total_sample_points as f32);
-        let mut lighting = 0.0;
+        let mut lighting = Float3::zero();
         for quad in &self.quads
         {
             let light_point = quad.center_point();
             let ray_dir = light_point - *point;
             let ray_dir_n = normalize(&ray_dir);
-            let origin = (*point) + (0.01 * ray_dir_n);
-            let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - 0.02);
+            let origin = (*point) + (EPSILON * ray_dir_n);
+            let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
 
             if self.is_occluded(&ray)
             {
                 continue;
             }
 
+            let light_uv = quad.get_uv(&light_point);
+            let light_color = self.materials[quad.mat_idx as usize].get_color(&light_uv);
             // take distance to the light?
-            lighting += light_strength * dot(&ray_dir_n, &normal);
+            lighting += light_strength * dot(&ray_dir_n, &normal) * light_color;
         }
 
         return lighting;
