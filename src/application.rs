@@ -62,6 +62,9 @@ impl Application
         ui.radio_button(ImString::new("Ray tracing + Soft Shadows").deref(), &mut self.renderer.render_mode, RenderMode::SoftShadows);
         ui.radio_button(ImString::new("Normals").deref(), &mut self.renderer.render_mode, RenderMode::Normals);
         ui.radio_button(ImString::new("Distance").deref(), &mut self.renderer.render_mode, RenderMode::Distance);
+
+        ui.slider_int(ImString::new("Area sample size").deref(), &mut self.renderer.area_sample_size, 1, 200 ).build();
+
     }
 
     pub fn shutdown(&mut self)

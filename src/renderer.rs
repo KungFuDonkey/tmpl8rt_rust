@@ -20,7 +20,8 @@ pub struct Renderer
     pub random_seeds: Vec<u32>,
     pub render_target: Surface,
     pub render_mode: RenderMode,
-    seed: u32
+    pub area_sample_size: i32,
+    seed: u32,
 }
 
 impl Renderer
@@ -35,6 +36,7 @@ impl Renderer
             random_seeds: vec![0; SCRWIDTH * SCRHEIGHT],
             render_target: Surface::new(),
             render_mode: RenderMode::Standard,
+            area_sample_size: 1,
             seed
         }
     }
@@ -47,7 +49,7 @@ impl Renderer
             return Float3::zero();
         }
         let intersection = ray.intersection_point();
-        let normal = scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
+        let normal = scene.get_normal(ray, &intersection, &ray.direction);
 
         return (normal + 1.0) * 0.5;
     }
@@ -71,10 +73,10 @@ impl Renderer
         }
         let intersection = ray.intersection_point();
 
-        return scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
+        return scene.get_albedo(ray, &intersection);
     }
 
-    fn trace_soft_shadow(ray: &mut Ray, scene: &Scene, seed: &mut u32) -> Float3
+    fn trace_soft_shadow(ray: &mut Ray, scene: &Scene, area_sample_size: usize, seed: &mut u32) -> Float3
     {
         scene.intersect_scene(ray);
         if ray.obj_idx == -1
@@ -82,9 +84,9 @@ impl Renderer
             return Float3::zero();
         }
         let intersection = ray.intersection_point();
-        let normal = scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
+        let normal = scene.get_normal(ray, &intersection, &ray.direction);
 
-        return scene.direct_lighting_soft(&intersection, &normal, seed) * scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
+        return scene.direct_lighting_soft(&intersection, &normal, area_sample_size, seed) * scene.get_albedo(ray, &intersection);
     }
 
     fn trace_hard_shadow(ray: &mut Ray, scene: &Scene) -> Float3
@@ -95,9 +97,9 @@ impl Renderer
             return Float3::zero();
         }
         let intersection = ray.intersection_point();
-        let normal = scene.get_normal(ray.obj_idx, &ray.obj_type, &intersection, &ray.direction);
+        let normal = scene.get_normal(ray, &intersection, &ray.direction);
 
-        return scene.direct_lighting_hard(&intersection, &normal) * scene.get_albedo(ray.obj_idx, &ray.obj_type, &intersection);
+        return scene.direct_lighting_hard(&intersection, &normal) * scene.get_albedo(ray, &intersection);
     }
 
     pub fn render(&mut self, scene: &Scene, camera: &Camera)
@@ -124,7 +126,7 @@ impl Renderer
                     {
                         let mut seed = self.random_seeds[index];
                         let mut ray = camera.get_primary_ray_indexed(index);
-                        let ray_color = Renderer::trace_soft_shadow(&mut ray, &scene, &mut seed);
+                        let ray_color = Renderer::trace_soft_shadow(&mut ray, &scene, self.area_sample_size as usize, &mut seed);
                         *value = rgbf32_to_rgb8_f3(&ray_color);
                     });
             },

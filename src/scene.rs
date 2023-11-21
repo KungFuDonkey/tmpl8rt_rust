@@ -10,7 +10,8 @@ pub enum RayHittableObjectType
     Plane,
     Cube,
     Torus,
-    Quad
+    Quad,
+    Mesh
 }
 
 #[repr(C, align(64))]
@@ -21,6 +22,7 @@ pub struct Ray {
     pub  r_direction: Float3,
     pub t: f32,
     pub obj_idx: i32,
+    pub sub_obj_idx: usize,
     pub obj_type: RayHittableObjectType,
     pub inside: bool
 }
@@ -36,6 +38,7 @@ impl Ray {
             r_direction: Float3::zero(),
             t: 1.0e34,
             obj_idx: -1,
+            sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
             inside: false
         }
@@ -49,6 +52,7 @@ impl Ray {
             r_direction: Float3::from_xyz(1.0 / direction.x, 1.0 / direction.y, 1.0 / direction.z),
             t: 1.0e34,
             obj_idx: -1,
+            sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
             inside: false
         }
@@ -63,6 +67,7 @@ impl Ray {
             r_direction: Float3::from_xyz(1.0 / direction.x, 1.0 / direction.y, 1.0 / direction.z),
             t: distance,
             obj_idx: -1,
+            sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
             inside: false
         }
@@ -437,15 +442,21 @@ impl Quad
         }
     }
 
-    pub fn random_point(&self, seed: &mut u32) -> Float3
+    pub fn random_points(&self, num: usize, seed: &mut u32) -> Vec<Float3>
     {
-        let r1 = random_float_s(seed);
-        let r2 = random_float_s(seed);
+        let mut vector: Vec<Float3> = Vec::with_capacity(num);
         let size = self.size;
         let corner1 = transform_position(&Float3::from_xyz(-size, 0.0, -size), &self.t);
         let corner2 = transform_position(&Float3::from_xyz(size, 0.0, -size), &self.t);
         let corner3 = transform_position(&Float3::from_xyz(-size, 0.0, size), &self.t);
-        return corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1);
+
+        for _ in 0..num
+        {
+            let r1 = random_float_s(seed);
+            let r2 = random_float_s(seed);
+            vector.push(corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1));
+        }
+        return vector;
     }
 
     pub fn center_point(&self) -> Float3
@@ -817,6 +828,161 @@ impl RayHittableObject for Torus
     }
 }
 
+pub struct Mesh
+{
+    pub vertices: Vec<Float3>,
+    pub triangles: Vec<[usize; 3]>,
+    pub triangle_normals: Vec<Float3>,
+    pub obj_idx: i32,
+    pub mat_idx: i32,
+}
+
+impl Mesh
+{
+    fn triangle(obj_idx: i32, mat_idx: i32) -> Self
+    {
+        let vertices = vec![Float3::from_xyz(0.0, 0.0, 1.5), Float3::from_xyz(1.0, 0.0, 1.5), Float3::from_xyz(0.0, 1.0, 1.8)];
+        let triangles = vec![[0,2,1]];
+
+        let mut triangle_normals: Vec<Float3> = Vec::with_capacity(triangles.len());
+        for triangle in &triangles
+        {
+            let v0 = vertices[triangle[0]];
+            let v1 = vertices[triangle[1]];
+            let v2 = vertices[triangle[2]];
+
+            let v0v1 = v1 - v0;
+            let v0v2 = v2 - v0;
+            triangle_normals.push(normalize(&cross(&v0v1, &v0v2)));
+        }
+
+        Mesh
+        {
+            vertices,
+            triangles,
+            triangle_normals,
+            obj_idx,
+            mat_idx
+        }
+    }
+
+    fn intersect_triangle(&self, ray: &mut Ray, vertex0: usize, vertex1: usize, vertex2: usize, triangle_index: usize)
+    {
+        // cull if not facing in direction of normal, check if correct
+        if dot(&self.triangle_normals[triangle_index], &ray.direction) > 0.0
+        {
+            return;
+        }
+
+        let v0 = self.vertices[vertex0];
+        let v1 = self.vertices[vertex1];
+        let v2 = self.vertices[vertex2];
+        let v0v1 = v1 - v0;
+        let v0v2 = v2 - v0;
+        let pvec = cross(&ray.direction, &v0v2);
+        let det = dot(&v0v1, &pvec);
+
+        // cull backsides
+        if det < EPSILON
+        {
+            return;
+        }
+
+        let inv_det = 1.0 / det;
+
+        let tvec = ray.origin - v0;
+        let u = dot(&tvec, &pvec) * inv_det;
+        if u < 0.0 || u > 1.0
+        {
+            return;
+        }
+
+        let qvec = cross( &tvec, &v0v1);
+        let v = dot(&ray.direction, &qvec) * inv_det;
+        if v < 0.0 || u + v > 1.0
+        {
+            return;
+        }
+
+        let t = dot(&v0v2, &qvec) * inv_det;
+        if t > 0.0 && t < ray.t
+        {
+            ray.obj_idx = self.obj_idx;
+            ray.t = dot(&v0v2, &qvec) * inv_det;
+            ray.obj_type = RayHittableObjectType::Mesh;
+            ray.sub_obj_idx = triangle_index;
+        }
+    }
+
+    fn is_occluded_triangle(&self, ray: &Ray, vertex0: usize, vertex1: usize, vertex2: usize) -> bool
+    {
+        let v0 = self.vertices[vertex0];
+        let v1 = self.vertices[vertex1];
+        let v2 = self.vertices[vertex2];
+        let v0v1 = v1 - v0;
+        let v0v2 = v2 - v0;
+        let pvec = cross(&ray.direction, &v0v2);
+        let det = dot(&v0v1, &pvec);
+
+        // do not cull backsides
+        if det.abs() < EPSILON
+        {
+            return false;
+        }
+
+        let inv_det = 1.0 / det;
+
+        let tvec = ray.origin - v0;
+        let u = dot(&tvec, &pvec) * inv_det;
+        if u < 0.0 || u > 1.0
+        {
+            return false;
+        }
+
+        let qvec = cross( &tvec, &v0v1);
+        let v = dot(&ray.direction, &qvec) * inv_det;
+        if v < 0.0 || u + v > 1.0
+        {
+            return false;
+        }
+
+        let t = dot(&v0v2, &qvec) * inv_det;
+        return t > 0.0 && t < ray.t;
+    }
+}
+
+impl RayHittableObject for Mesh
+{
+    fn intersect(&self, ray: &mut Ray) {
+        for (triangle_index, triangle) in self.triangles.iter().enumerate()
+        {
+            self.intersect_triangle(ray, triangle[0], triangle[1], triangle[2], triangle_index);
+        }
+    }
+
+    fn get_normal(&self, i: &Float3) -> Float3 {
+        // needs to interpolate between normals
+        self.triangle_normals[0]
+    }
+
+    fn get_uv(&self, i: &Float3) -> Float2 {
+        Float2::zero()
+    }
+
+    fn is_occluded(&self, ray: &Ray) -> bool {
+        for triangle in &self.triangles
+        {
+            if self.is_occluded_triangle(ray, triangle[0], triangle[1], triangle[2])
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+
+
 
 pub struct Scene
 {
@@ -825,11 +991,10 @@ pub struct Scene
     cubes: Vec<Cube>,
     tori: Vec<Torus>,
     quads: Vec<Quad>,
+    meshes: Vec<Mesh>,
     materials: Vec<Box<dyn Material + Sync>>,
     animation_time: f32,
 }
-
-const QUAD_SAMPLE_SIZE: u32 = 1;
 
 impl Scene
 {
@@ -864,6 +1029,9 @@ impl Scene
                 Quad::new(1, 7, 0.5, &Mat4::translate(&Float3::from_xyz(1.0, 1.5, -1.0))),
                 Quad::new(2, 8, 0.5, &Mat4::translate(&Float3::from_xyz(1.0, 1.5, 1.0))),
                 Quad::new(3, 0, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, 1.0))),
+            ],
+            meshes: vec![
+                Mesh::triangle(0, 6)
             ],
             materials: vec![
                 Box::new(LinearColorMaterial::new(Float3::from_a(1.0))),
@@ -906,6 +1074,11 @@ impl Scene
         {
             quad.intersect(ray);
         }
+
+        for mesh in &self.meshes
+        {
+            mesh.intersect(ray);
+        }
     }
 
     pub fn is_occluded(&self, ray: &Ray) -> bool
@@ -944,19 +1117,27 @@ impl Scene
             }
         }
 
+        for mesh in &self.meshes
+        {
+            if mesh.is_occluded(ray)
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 
-    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, seed: &mut u32) -> Float3
+    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, area_sample_size: usize, seed: &mut u32) -> Float3
     {
-        let total_sample_points = (self.quads.len() as u32) * QUAD_SAMPLE_SIZE;
+        let total_sample_points = self.quads.len() * area_sample_size;
         let sample_strength = 1.0 / (total_sample_points as f32);
         let mut lighting = Float3::zero();
         for quad in &self.quads
         {
-            for _ in 0..QUAD_SAMPLE_SIZE
+            let light_points = quad.random_points(area_sample_size, seed);
+            for light_point in light_points
             {
-                let light_point = quad.random_point(seed);
                 let ray_dir = light_point - *point;
                 let ray_dir_n = normalize(&ray_dir);
                 let origin = (*point) + (EPSILON * ray_dir_n);
@@ -1005,13 +1186,17 @@ impl Scene
     }
 
 
-    pub fn get_normal(&self, obj_idx: i32, obj_type: &RayHittableObjectType, i: &Float3, wo: &Float3) -> Float3
+    pub fn get_normal(&self, ray: &Ray, i: &Float3, wo: &Float3) -> Float3
     {
+        let obj_idx = ray.obj_idx;
         if obj_idx == -1
         {
             println!("ERROR: obj_idx not set or no object was hit");
             return Float3::zero();
         }
+
+        let obj_idx = obj_idx as usize;
+        let obj_type = ray.obj_type;
 
         let normal = match obj_type
         {
@@ -1022,23 +1207,27 @@ impl Scene
             },
             RayHittableObjectType::Sphere =>
             {
-                self.spheres[obj_idx as usize].get_normal(i)
+                self.spheres[obj_idx].get_normal(i)
             },
             RayHittableObjectType::Plane =>
             {
-                self.planes[obj_idx as usize].get_normal(i)
+                self.planes[obj_idx].get_normal(i)
             },
             RayHittableObjectType::Cube =>
             {
-                self.cubes[obj_idx as usize].get_normal(i)
+                self.cubes[obj_idx].get_normal(i)
             },
             RayHittableObjectType::Torus =>
             {
-                self.tori[obj_idx as usize].get_normal(i)
+                self.tori[obj_idx].get_normal(i)
+            },
+            RayHittableObjectType::Mesh =>
+            {
+                self.meshes[obj_idx].triangle_normals[ray.sub_obj_idx]
             },
             RayHittableObjectType::Quad =>
             {
-                self.quads[obj_idx as usize].get_normal(i)
+                self.quads[obj_idx].get_normal(i)
             }
         };
 
@@ -1049,8 +1238,10 @@ impl Scene
         return normal;
     }
 
-    pub fn get_albedo(&self, obj_idx: i32, obj_type: &RayHittableObjectType, i: &Float3) -> Float3
+    pub fn get_albedo(&self, ray: &Ray, i: &Float3) -> Float3
     {
+        let obj_idx = ray.obj_idx as usize;
+        let obj_type = ray.obj_type;
         let (uv, mat_idx) = match obj_type
         {
             RayHittableObjectType::None =>
@@ -1077,6 +1268,11 @@ impl Scene
                 let q = &self.quads[obj_idx as usize];
                 (q.get_uv(i), q.mat_idx)
             },
+            RayHittableObjectType::Mesh =>
+            {
+                let m = &self.meshes[obj_idx];
+                (m.get_uv(i), m.mat_idx)
+            }
             RayHittableObjectType::Torus =>
             {
                 let t = &self.tori[obj_idx as usize];
