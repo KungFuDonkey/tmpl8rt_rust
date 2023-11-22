@@ -5,7 +5,7 @@ use crate::timer::{FrameTimer};
 use imgui_glfw_rs::imgui::Ui;
 use imgui_glfw_rs::imgui::ImString;
 use crate::input::Input;
-use crate::renderer::{Renderer, RenderMode};
+use crate::renderer::{LightingMode, Renderer, RenderMode};
 
 
 pub struct Application
@@ -58,12 +58,20 @@ impl Application
         ui.checkbox(ImString::new("Animate scene").deref(), &mut self.animating);
         ui.text(ImString::new("Render mode:").deref());
         ui.radio_button(ImString::new("Ray tracing").deref(), &mut self.renderer.render_mode, RenderMode::Standard);
-        ui.radio_button(ImString::new("Ray tracing + Hard Shadows").deref(), &mut self.renderer.render_mode, RenderMode::HardShadows);
-        ui.radio_button(ImString::new("Ray tracing + Soft Shadows").deref(), &mut self.renderer.render_mode, RenderMode::SoftShadows);
         ui.radio_button(ImString::new("Normals").deref(), &mut self.renderer.render_mode, RenderMode::Normals);
         ui.radio_button(ImString::new("Distance").deref(), &mut self.renderer.render_mode, RenderMode::Distance);
 
-        ui.slider_int(ImString::new("Area sample size").deref(), &mut self.renderer.area_sample_size, 1, 200 ).build();
+        ui.text(ImString::new("Raytracing Settings:").deref());
+        ui.slider_int(ImString::new("Bounces").deref(), &mut self.renderer.ray_tracing_settings.max_bounces, 1, 8 ).build();
+
+        ui.text(ImString::new("Shadows:").deref());
+        ui.radio_button(ImString::new("No shadows").deref(), &mut self.renderer.ray_tracing_settings.lighting_mode, LightingMode::None);
+        ui.radio_button(ImString::new("Ray tracing + Hard Shadows").deref(), &mut self.renderer.ray_tracing_settings.lighting_mode, LightingMode::HardShadows);
+        ui.radio_button(ImString::new("Ray tracing + Soft Shadows").deref(), &mut self.renderer.ray_tracing_settings.lighting_mode, LightingMode::SoftShadows);
+
+
+        ui.slider_int(ImString::new("Light sample size").deref(), &mut self.renderer.ray_tracing_settings.area_sample_size, 1, 8 ).build();
+
 
     }
 

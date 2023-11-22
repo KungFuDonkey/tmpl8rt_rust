@@ -12,6 +12,7 @@ pub enum UVMaterial
 pub enum Material
 {
     LinearColorMaterial (Float3),
+    ReflectiveMaterial (Float3, f32),
     UV (UVMaterial)
 }
 

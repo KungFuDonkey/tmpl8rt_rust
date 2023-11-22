@@ -1007,7 +1007,7 @@ impl Scene
 
         Scene{
             spheres: vec![
-                Sphere::new(0, 0, Float3::from_a(0.0), 0.3),
+                Sphere::new(0, 9, Float3::from_a(0.0), 0.3),
                 Sphere::new(1, 0, Float3::from_xyz( 0.0, 2.5, -3.07 ), 8.0)
             ],
             planes: vec![
@@ -1043,6 +1043,7 @@ impl Scene
                 Material::LinearColorMaterial(Float3::from_xyz(1.0, 0.0, 0.0)),
                 Material::LinearColorMaterial(Float3::from_xyz(0.0, 1.0, 0.0)),
                 Material::LinearColorMaterial(Float3::from_xyz(0.0, 0.0, 1.0)),
+                Material::ReflectiveMaterial(Float3::from_a(1.0), 1.0)
             ],
             animation_time: 0.0
         }
@@ -1128,6 +1129,25 @@ impl Scene
         return false;
     }
 
+    fn get_quad_light_color(&self, quad: &Quad, light_point: &Float3) -> Float3
+    {
+        match &self.materials[quad.mat_idx as usize]
+        {
+            Material::LinearColorMaterial(color) =>
+            {
+                *color
+            },
+            Material::ReflectiveMaterial(color, _) =>
+            {
+                *color
+            },
+            Material::UV(uv_material) =>
+            {
+                get_color_from_uv_material(uv_material, &quad.get_uv(&light_point))
+            }
+        }
+    }
+
     pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, area_sample_size: usize, seed: &mut u32) -> Float3
     {
         let total_sample_points = self.quads.len() * area_sample_size;
@@ -1148,17 +1168,7 @@ impl Scene
                     continue;
                 }
 
-                let light_color = match &self.materials[quad.mat_idx as usize]
-                {
-                    Material::LinearColorMaterial(color) =>
-                    {
-                        *color
-                    }
-                    Material::UV(uv_material) =>
-                    {
-                        get_color_from_uv_material(uv_material, &quad.get_uv(&light_point))
-                    }
-                };
+                let light_color = self.get_quad_light_color(&quad, &light_point);
                 // take distance to the light?
                 lighting += sample_strength * dot(&ray_dir_n, &normal) * light_color;
             }
@@ -1185,17 +1195,7 @@ impl Scene
                 continue;
             }
 
-            let light_color = match &self.materials[quad.mat_idx as usize]
-            {
-                Material::LinearColorMaterial(color) =>
-                {
-                    *color
-                }
-                Material::UV(uv_material) =>
-                {
-                    get_color_from_uv_material(uv_material, &quad.get_uv(&light_point))
-                }
-            };
+            let light_color = self.get_quad_light_color(&quad, &light_point);
 
             // take distance to the light?
             lighting += light_strength * dot(&ray_dir_n, &normal) * light_color;
@@ -1257,61 +1257,78 @@ impl Scene
         return normal;
     }
 
-    pub fn get_albedo(&self, ray: &Ray, i: &Float3) -> Float3
+    pub fn get_material(&self, ray: &Ray) -> &Material
     {
         let obj_idx = ray.obj_idx as usize;
         let obj_type = ray.obj_type;
-        let (uv, mat_idx) = match obj_type
+        let mat_idx = match obj_type
         {
             RayHittableObjectType::None =>
             {
-                (Float2::zero(), -1)
+                -1
             },
             RayHittableObjectType::Sphere =>
             {
-                let s = &self.spheres[obj_idx as usize];
-                (s.get_uv(i), s.mat_idx)
+                self.spheres[obj_idx as usize].mat_idx
             },
             RayHittableObjectType::Plane =>
             {
-                let p = &self.planes[obj_idx as usize];
-                (p.get_uv(i), p.mat_idx)
+                self.planes[obj_idx as usize].mat_idx
             },
             RayHittableObjectType::Cube =>
             {
-                let c = &self.cubes[obj_idx as usize];
-                (c.get_uv(i), c.mat_idx)
+                self.cubes[obj_idx as usize].mat_idx
             },
             RayHittableObjectType::Quad =>
             {
-                let q = &self.quads[obj_idx as usize];
-                (q.get_uv(i), q.mat_idx)
+                self.quads[obj_idx as usize].mat_idx
             },
             RayHittableObjectType::Mesh =>
             {
-                let m = &self.meshes[obj_idx];
-                (m.get_uv(i), m.mat_idx)
-            }
+                self.meshes[obj_idx as usize].mat_idx
+            },
             RayHittableObjectType::Torus =>
             {
-                let t = &self.tori[obj_idx as usize];
-                (t.get_uv(i), t.mat_idx)
+                self.tori[obj_idx as usize].mat_idx
             }
         };
+        &self.materials[mat_idx as usize]
+    }
 
-        if mat_idx == -1
+    pub fn get_uv(&self, ray: &Ray, i: &Float3) -> Float2
+    {
+        let obj_idx = ray.obj_idx as usize;
+        let obj_type = ray.obj_type;
+        match obj_type
         {
-            return Float3::zero();
-        }
-
-        match &self.materials[mat_idx as usize] {
-            Material::LinearColorMaterial(color) =>
+            RayHittableObjectType::None =>
             {
-                return *color;
+                Float2::zero()
             },
-            Material::UV(uv_material) =>
+            RayHittableObjectType::Sphere =>
             {
-                return get_color_from_uv_material(uv_material, &uv)
+                self.spheres[obj_idx].get_uv(i)
+            },
+            RayHittableObjectType::Plane =>
+            {
+                self.planes[obj_idx].get_uv(i)
+            },
+            RayHittableObjectType::Cube =>
+            {
+                self.cubes[obj_idx].get_uv(i)
+            },
+            RayHittableObjectType::Quad =>
+            {
+                self.quads[obj_idx].get_uv(i)
+            },
+            RayHittableObjectType::Mesh =>
+            {
+                // should get uv from triangle
+                self.meshes[obj_idx].get_uv(i)
+            },
+            RayHittableObjectType::Torus =>
+            {
+                self.tori[obj_idx].get_uv(i)
             }
         }
     }
