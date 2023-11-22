@@ -62,7 +62,7 @@ impl Application
         ui.radio_button(ImString::new("Distance").deref(), &mut self.renderer.render_mode, RenderMode::Distance);
 
         ui.text(ImString::new("Raytracing Settings:").deref());
-        ui.slider_int(ImString::new("Bounces").deref(), &mut self.renderer.ray_tracing_settings.max_bounces, 1, 8 ).build();
+        ui.slider_int(ImString::new("Bounces").deref(), &mut self.renderer.ray_tracing_settings.max_bounces, 0, 8 ).build();
 
         ui.text(ImString::new("Shadows:").deref());
         ui.radio_button(ImString::new("No shadows").deref(), &mut self.renderer.ray_tracing_settings.lighting_mode, LightingMode::None);

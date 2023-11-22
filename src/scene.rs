@@ -1019,7 +1019,7 @@ impl Scene
                 Plane::new(5, 3, Float3::from_xyz(0.0, 0.0, -1.0), 3.99, PlaneUVFunction::xy()),
             ],
             cubes: vec![
-                Cube::new(0, 0, Float3::zero(), Float3::from_a(1.15))
+                Cube::new(0, 10, Float3::zero(), Float3::from_a(1.15))
             ],
             tori: vec![
                 torus
@@ -1034,16 +1034,17 @@ impl Scene
                 Mesh::triangle(0, 6)
             ],
             materials: vec![
-                Material::LinearColorMaterial(Float3::from_a(1.0)),
-                Material::LinearColorMaterial(Float3::from_a(0.93)),
+                linear_color(Float3::from_a(1.0)),
+                linear_color(Float3::from_a(0.93)),
                 checkerboard_material(),
                 logo_material(),
                 red_material(),
                 blue_material(),
-                Material::LinearColorMaterial(Float3::from_xyz(1.0, 0.0, 0.0)),
-                Material::LinearColorMaterial(Float3::from_xyz(0.0, 1.0, 0.0)),
-                Material::LinearColorMaterial(Float3::from_xyz(0.0, 0.0, 1.0)),
-                Material::ReflectiveMaterial(Float3::from_a(1.0), 1.0)
+                linear_color(Float3::from_xyz(1.0, 0.0, 0.0)),
+                linear_color(Float3::from_xyz(0.0, 1.0, 0.0)),
+                linear_color(Float3::from_xyz(0.0, 0.0, 1.0)),
+                reflective_material(linear_color_simple(Float3::from_a(1.0)), 0.02),
+                fully_reflective_material(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0))),
             ],
             animation_time: 0.0
         }
@@ -1129,22 +1130,15 @@ impl Scene
         return false;
     }
 
+
     fn get_quad_light_color(&self, quad: &Quad, light_point: &Float3) -> Float3
     {
-        match &self.materials[quad.mat_idx as usize]
+        let simple_material = get_simple_material(&self.materials[quad.mat_idx as usize]);
+        match simple_material
         {
-            Material::LinearColorMaterial(color) =>
-            {
-                *color
-            },
-            Material::ReflectiveMaterial(color, _) =>
-            {
-                *color
-            },
-            Material::UV(uv_material) =>
-            {
-                get_color_from_uv_material(uv_material, &quad.get_uv(&light_point))
-            }
+            SimpleMaterial::LinearColorMaterial(color) => *color,
+            SimpleMaterial::UV(uv_material) => get_color_from_uv_material(uv_material, &quad.get_uv(&light_point)),
+            SimpleMaterial::BlackMaterial => Float3::zero()
         }
     }
 

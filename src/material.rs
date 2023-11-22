@@ -9,11 +9,18 @@ pub enum UVMaterial
     JaccoMaterial (Surface)
 }
 
+pub enum SimpleMaterial
+{
+    BlackMaterial,
+    LinearColorMaterial (Float3),
+    UV (UVMaterial)
+}
+
 pub enum Material
 {
-    LinearColorMaterial (Float3),
-    ReflectiveMaterial (Float3, f32),
-    UV (UVMaterial)
+    Simple (SimpleMaterial),
+    FullyReflectiveMaterial (SimpleMaterial),
+    ReflectiveMaterial (SimpleMaterial, f32),
 }
 
 fn get_color_from_pixel(pixel: u32) -> Float3
@@ -76,22 +83,72 @@ pub fn get_color_from_uv_material(material: &UVMaterial, uv: &Float2) -> Float3
     }
 }
 
+pub fn get_simple_material(material: &Material) -> &SimpleMaterial
+{
+    match material
+    {
+        Material::Simple(simple_material) => simple_material,
+        Material::ReflectiveMaterial(simple_material, _) => simple_material,
+        Material::FullyReflectiveMaterial(simple_material) => simple_material,
+    }
+}
+
+pub fn linear_color_simple(color: Float3) -> SimpleMaterial
+{
+    SimpleMaterial::LinearColorMaterial(color)
+}
+
+pub fn linear_color(color: Float3) -> Material
+{
+    Material::Simple(linear_color_simple(color))
+}
+
+pub fn checkerboard_material_simple() -> SimpleMaterial
+{
+    SimpleMaterial::UV(CheckerboardMaterial)
+}
+
 pub fn checkerboard_material() -> Material
 {
-    Material::UV(CheckerboardMaterial)
+    Material::Simple(checkerboard_material_simple())
+}
+
+pub fn blue_material_simple() -> SimpleMaterial
+{
+    SimpleMaterial::UV(JaccoMaterial(Surface::load_from_file(std::path::Path::new("./assets/blue.png"))))
 }
 
 pub fn blue_material() -> Material
 {
-    Material::UV(JaccoMaterial(Surface::load_from_file(std::path::Path::new("./assets/blue.png"))))
+    Material::Simple(blue_material_simple())
+}
+
+pub fn red_material_simple() -> SimpleMaterial
+{
+    SimpleMaterial::UV(JaccoMaterial(Surface::load_from_file(std::path::Path::new("./assets/red.png"))))
 }
 
 pub fn red_material() -> Material
 {
-    Material::UV(JaccoMaterial(Surface::load_from_file(std::path::Path::new("./assets/red.png"))))
+    Material::Simple(red_material_simple())
+}
+
+pub fn logo_material_simple() -> SimpleMaterial
+{
+    SimpleMaterial::UV(LogoMaterial(Surface::load_from_file(std::path::Path::new("./assets/logo.png"))))
 }
 
 pub fn logo_material() -> Material
 {
-    Material::UV(LogoMaterial(Surface::load_from_file(std::path::Path::new("./assets/logo.png"))))
+    Material::Simple(logo_material_simple())
+}
+
+pub fn reflective_material(material: SimpleMaterial, reflectivity: f32) -> Material
+{
+    Material::ReflectiveMaterial(material, reflectivity)
+}
+
+pub fn fully_reflective_material(material: SimpleMaterial) -> Material
+{
+    Material::FullyReflectiveMaterial(material)
 }

@@ -53,7 +53,7 @@ impl Renderer
             render_target: Surface::new(),
             render_mode: RenderMode::Standard,
             ray_tracing_settings: RaytracingSettings {
-                max_bounces: 2,
+                max_bounces: 1,
                 lighting_mode: LightingMode::None,
                 area_sample_size: 1,
             },
@@ -84,6 +84,16 @@ impl Renderer
         return Float3::from_xyz(ray.t, ray.t, ray.t) * 0.1;
     }
 
+    fn get_lighting_color(ray: &Ray, scene: &Scene, intersection: &Float3, material: &Material, render_settings: &RaytracingSettings, seed: &mut u32) -> Float3
+    {
+        let lighting: Float3 = match render_settings.lighting_mode {
+            LightingMode::None => Float3::from_a(1.0),
+            LightingMode::HardShadows => scene.direct_lighting_hard(&intersection, &scene.get_normal(ray, &intersection, &ray.direction)),
+            LightingMode::SoftShadows => scene.direct_lighting_soft(&intersection, &scene.get_normal(ray, &intersection, &ray.direction), render_settings.area_sample_size as usize, seed)
+        };
+        return lighting * Self::get_color_from_material(ray, scene, &intersection, material);
+    }
+
     fn trace(ray: &mut Ray, scene: &Scene, render_settings: &RaytracingSettings, seed: &mut u32, bounces: i32) -> Float3
     {
         scene.intersect_scene(ray);
@@ -96,26 +106,31 @@ impl Renderer
 
         if bounces > render_settings.max_bounces
         {
-            return Self::get_color_from_material(ray, scene, &intersection, material);
+            return Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);
         }
 
         match material
         {
-            Material::ReflectiveMaterial(color, reflectivity) =>
+            Material::ReflectiveMaterial(reflection_material, reflectivity) =>
             {
                 let normal = scene.get_normal(ray, &intersection, &ray.direction);
                 let reflected_ray_direction = reflect(&ray.direction, &normal);
                 let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
-                return (*color) * (Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1));
+                let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, reflection_material);
+                let object_color = Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);
+                return (material_color) * (*reflectivity * Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1) + (1.0 - reflectivity) * object_color);
+            }
+            Material::FullyReflectiveMaterial(reflection_material) =>
+            {
+                let normal = scene.get_normal(ray, &intersection, &ray.direction);
+                let reflected_ray_direction = reflect(&ray.direction, &normal);
+                let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
+                let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, reflection_material);
+                return (material_color) * Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
             }
             _ =>
             {
-                let lighting: Float3 = match render_settings.lighting_mode {
-                    LightingMode::None => Float3::from_a(1.0),
-                    LightingMode::HardShadows => scene.direct_lighting_hard(&intersection, &scene.get_normal(ray, &intersection, &ray.direction)),
-                    LightingMode::SoftShadows => scene.direct_lighting_soft(&intersection, &scene.get_normal(ray, &intersection, &ray.direction), render_settings.area_sample_size as usize, seed)
-                };
-                return lighting * Self::get_color_from_material(ray, scene, &intersection, material);
+                return Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);
             }
         }
     }
@@ -133,7 +148,7 @@ impl Renderer
                 {
                     let mut seed = self.random_seeds[index];
                     let mut ray = camera.get_primary_ray_indexed(index);
-                    let ray_color = Renderer::trace(&mut ray, &scene, &self.ray_tracing_settings, &mut seed, 0);
+                    let ray_color = Renderer::trace(&mut ray, &scene, &self.ray_tracing_settings, &mut seed, 1);
                     *value = rgbf32_to_rgb8_f3(&ray_color);
                 });
             },
@@ -156,17 +171,22 @@ impl Renderer
         }
     }
 
-    fn get_color_from_material(ray: &mut Ray, scene: &Scene, intersection: &Float3, material: &Material) -> Float3
+    fn get_color_from_material(ray: &Ray, scene: &Scene, intersection: &Float3, material: &Material) -> Float3
     {
-        match material
+        Renderer::get_color_from_simple_material(ray, scene, intersection, get_simple_material(material))
+    }
+
+    fn get_color_from_simple_material(ray: &Ray, scene: &Scene, intersection: &Float3, simple_material: &SimpleMaterial) -> Float3
+    {
+        match simple_material
         {
-            Material::LinearColorMaterial(color) => { return *color; }
-            Material::ReflectiveMaterial(color, _) => { return *color; }
-            Material::UV(uv_material) =>
-                {
-                    let uv = scene.get_uv(ray, &intersection);
-                    return get_color_from_uv_material(uv_material, &uv);
-                }
+            SimpleMaterial::LinearColorMaterial(color) => { return *color; }
+            SimpleMaterial::UV(uv_material) =>
+            {
+                let uv = scene.get_uv(ray, &intersection);
+                return get_color_from_uv_material(uv_material, &uv);
+            }
+            SimpleMaterial::BlackMaterial => { return Float3::zero(); }
         }
     }
 }
