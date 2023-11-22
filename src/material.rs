@@ -1,98 +1,18 @@
+use crate::material::UVMaterial::{CheckerboardMaterial, LogoMaterial, JaccoMaterial};
 use crate::math::{Float2, Float3};
 use crate::surface::Surface;
 
-pub trait Material
+pub enum UVMaterial
 {
-    fn get_color(&self, uv: &Float2) -> Float3;
+    CheckerboardMaterial,
+    LogoMaterial (Surface),
+    JaccoMaterial (Surface)
 }
 
-pub struct LinearColorMaterial
+pub enum Material
 {
-    color: Float3
-}
-
-impl Material for LinearColorMaterial
-{
-    fn get_color(&self, _: &Float2) -> Float3
-    {
-        return self.color;
-    }
-}
-
-impl LinearColorMaterial
-{
-    pub fn new(color: Float3) -> Self
-    {
-        LinearColorMaterial
-        {
-            color
-        }
-    }
-}
-
-pub struct CheckerBoardMaterial
-{
-
-}
-
-impl Material for CheckerBoardMaterial
-{
-    fn get_color(&self, uv: &Float2) -> Float3 {
-        let mut ix = (uv.x * 2.0 + 96.01) as i32;
-        let mut iz = (uv.y * 2.0 + 96.01) as i32;
-
-        if ix == 98 && iz == 98
-        {
-            ix = (uv.x * 32.01) as i32;
-            iz = (uv.y * 32.01) as i32;
-        }
-        if ix == 94 && iz == 98
-        {
-            ix = (uv.x * 64.01) as i32;
-            iz = (uv.y * 64.01) as i32;
-        }
-
-        if ((ix + iz) & 1) != 0
-        {
-            return Float3::from_a(1.0);
-        }
-        return Float3::from_a(0.3);
-    }
-}
-
-impl CheckerBoardMaterial
-{
-    pub fn new() -> Self { CheckerBoardMaterial{} }
-}
-
-pub struct LogoMaterial
-{
-    texture: Surface
-}
-
-impl Material for LogoMaterial
-{
-    fn get_color(&self, uv: &Float2) -> Float3
-    {
-        let ix = ((uv.x + 4.0) * (128.0 / 8.0)) as i32;
-        let iy = ((2.0 - uv.y) * (64.0 / 3.0)) as i32;
-        let pixel = self.texture.pixels[((ix & 127) + (iy & 63) * 128) as usize];
-        let r = ((pixel >> 16) & 255) as f32;
-        let g = ((pixel >> 8) & 255) as f32;
-        let b = (pixel & 255) as f32;
-        Float3::from_xyz(r,g,b) * Float3::from_a(1.0 / 255.0)
-    }
-}
-
-impl LogoMaterial
-{
-    pub fn new() -> Self
-    {
-        LogoMaterial
-        {
-            texture: Surface::load_from_file(std::path::Path::new("./assets/logo.png"))
-        }
-    }
+    LinearColorMaterial (Float3),
+    UV (UVMaterial)
 }
 
 fn get_color_from_pixel(pixel: u32) -> Float3
@@ -103,7 +23,7 @@ fn get_color_from_pixel(pixel: u32) -> Float3
     Float3::from_xyz(r, g, b) * Float3::from_a(1.0 / 255.0)
 }
 
-fn get_red_and_blue_color(uv: &Float2, texture: &Surface) -> Float3
+fn get_jacco_color(uv: &Float2, texture: &Surface) -> Float3
 {
     let ix = ((uv.x - 4.0) * (512.0 / 7.0)) as i32;
     let iy = ((2.0 - uv.y) * (512.0 / 3.0)) as i32;
@@ -112,51 +32,65 @@ fn get_red_and_blue_color(uv: &Float2, texture: &Surface) -> Float3
     get_color_from_pixel(pixel)
 }
 
-
-pub struct RedMaterial
+pub fn get_color_from_uv_material(material: &UVMaterial, uv: &Float2) -> Float3
 {
-    texture: Surface
-}
-
-impl Material for RedMaterial
-{
-    fn get_color(&self, uv: &Float2) -> Float3
+    match material
     {
-        get_red_and_blue_color(uv, &self.texture)
-    }
-}
-
-impl RedMaterial
-{
-    pub fn new() -> Self
-    {
-        RedMaterial
+        UVMaterial::CheckerboardMaterial =>
         {
-            texture: Surface::load_from_file(std::path::Path::new("./assets/red.png"))
+            let mut ix = (uv.x * 2.0 + 96.01) as i32;
+            let mut iz = (uv.y * 2.0 + 96.01) as i32;
+
+            if ix == 98 && iz == 98
+            {
+                ix = (uv.x * 32.01) as i32;
+                iz = (uv.y * 32.01) as i32;
+            }
+            if ix == 94 && iz == 98
+            {
+                ix = (uv.x * 64.01) as i32;
+                iz = (uv.y * 64.01) as i32;
+            }
+
+            if ((ix + iz) & 1) != 0
+            {
+                return Float3::from_a(1.0);
+            }
+            return Float3::from_a(0.3);
+        },
+        UVMaterial::LogoMaterial(texture) =>
+        {
+            let ix = ((uv.x + 4.0) * (128.0 / 8.0)) as i32;
+            let iy = ((2.0 - uv.y) * (64.0 / 3.0)) as i32;
+            let pixel = texture.pixels[((ix & 127) + (iy & 63) * 128) as usize];
+            let r = ((pixel >> 16) & 255) as f32;
+            let g = ((pixel >> 8) & 255) as f32;
+            let b = (pixel & 255) as f32;
+            Float3::from_xyz(r,g,b) * Float3::from_a(1.0 / 255.0)
+        },
+        UVMaterial::JaccoMaterial(texture) =>
+        {
+            get_jacco_color(&uv, &texture)
         }
     }
 }
 
-pub struct BlueMaterial
+pub fn checkerboard_material() -> Material
 {
-    texture: Surface
+    Material::UV(CheckerboardMaterial)
 }
 
-impl Material for BlueMaterial
+pub fn blue_material() -> Material
 {
-    fn get_color(&self, uv: &Float2) -> Float3
-    {
-        get_red_and_blue_color(uv, &self.texture)
-    }
+    Material::UV(JaccoMaterial(Surface::load_from_file(std::path::Path::new("./assets/blue.png"))))
 }
 
-impl BlueMaterial
+pub fn red_material() -> Material
 {
-    pub fn new() -> Self
-    {
-        BlueMaterial
-        {
-            texture: Surface::load_from_file(std::path::Path::new("./assets/blue.png"))
-        }
-    }
+    Material::UV(JaccoMaterial(Surface::load_from_file(std::path::Path::new("./assets/red.png"))))
+}
+
+pub fn logo_material() -> Material
+{
+    Material::UV(LogoMaterial(Surface::load_from_file(std::path::Path::new("./assets/logo.png"))))
 }

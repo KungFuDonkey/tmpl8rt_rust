@@ -1,5 +1,5 @@
 use std::f32::consts::PI;
-use crate::material::{BlueMaterial, CheckerBoardMaterial, LinearColorMaterial, LogoMaterial, Material, RedMaterial};
+use crate::material::*;
 use crate::math::*;
 
 #[derive(Debug, Clone, Copy)]
@@ -992,7 +992,7 @@ pub struct Scene
     tori: Vec<Torus>,
     quads: Vec<Quad>,
     meshes: Vec<Mesh>,
-    materials: Vec<Box<dyn Material + Sync>>,
+    materials: Vec<Material>,
     animation_time: f32,
 }
 
@@ -1034,15 +1034,15 @@ impl Scene
                 Mesh::triangle(0, 6)
             ],
             materials: vec![
-                Box::new(LinearColorMaterial::new(Float3::from_a(1.0))),
-                Box::new(LinearColorMaterial::new(Float3::from_a(0.93))),
-                Box::new(CheckerBoardMaterial::new()),
-                Box::new(LogoMaterial::new()),
-                Box::new(RedMaterial::new()),
-                Box::new(BlueMaterial::new()),
-                Box::new(LinearColorMaterial::new(Float3::from_xyz(1.0, 0.0, 0.0))),
-                Box::new(LinearColorMaterial::new(Float3::from_xyz(0.0, 1.0, 0.0))),
-                Box::new(LinearColorMaterial::new(Float3::from_xyz(0.0, 0.0, 1.0))),
+                Material::LinearColorMaterial(Float3::from_a(1.0)),
+                Material::LinearColorMaterial(Float3::from_a(0.93)),
+                checkerboard_material(),
+                logo_material(),
+                red_material(),
+                blue_material(),
+                Material::LinearColorMaterial(Float3::from_xyz(1.0, 0.0, 0.0)),
+                Material::LinearColorMaterial(Float3::from_xyz(0.0, 1.0, 0.0)),
+                Material::LinearColorMaterial(Float3::from_xyz(0.0, 0.0, 1.0)),
             ],
             animation_time: 0.0
         }
@@ -1148,8 +1148,17 @@ impl Scene
                     continue;
                 }
 
-                let light_uv = quad.get_uv(&light_point);
-                let light_color = self.materials[quad.mat_idx as usize].get_color(&light_uv);
+                let light_color = match &self.materials[quad.mat_idx as usize]
+                {
+                    Material::LinearColorMaterial(color) =>
+                    {
+                        *color
+                    }
+                    Material::UV(uv_material) =>
+                    {
+                        get_color_from_uv_material(uv_material, &quad.get_uv(&light_point))
+                    }
+                };
                 // take distance to the light?
                 lighting += sample_strength * dot(&ray_dir_n, &normal) * light_color;
             }
@@ -1176,8 +1185,18 @@ impl Scene
                 continue;
             }
 
-            let light_uv = quad.get_uv(&light_point);
-            let light_color = self.materials[quad.mat_idx as usize].get_color(&light_uv);
+            let light_color = match &self.materials[quad.mat_idx as usize]
+            {
+                Material::LinearColorMaterial(color) =>
+                {
+                    *color
+                }
+                Material::UV(uv_material) =>
+                {
+                    get_color_from_uv_material(uv_material, &quad.get_uv(&light_point))
+                }
+            };
+
             // take distance to the light?
             lighting += light_strength * dot(&ray_dir_n, &normal) * light_color;
         }
@@ -1285,7 +1304,16 @@ impl Scene
             return Float3::zero();
         }
 
-        return self.materials[mat_idx as usize].get_color(&uv);
+        match &self.materials[mat_idx as usize] {
+            Material::LinearColorMaterial(color) =>
+            {
+                return *color;
+            },
+            Material::UV(uv_material) =>
+            {
+                return get_color_from_uv_material(uv_material, &uv)
+            }
+        }
     }
 
     pub fn set_time(&mut self, time: f32)
