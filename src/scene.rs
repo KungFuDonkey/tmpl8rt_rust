@@ -11,7 +11,8 @@ pub enum RayHittableObjectType
     Cube,
     Torus,
     Quad,
-    Mesh
+    Mesh,
+    Bvh
 }
 
 #[repr(C, align(64))]
@@ -828,6 +829,832 @@ impl RayHittableObject for Torus
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct Triangle
+{
+    pub bounds: AABB,     // 24 bytes
+    pub tri_idx: i32,     //  4 bytes
+    pub vertex0: Float3,  // 12 bytes
+    pub vertex1: Float3,  // 12 bytes
+    pub vertex2: Float3   // 12 bytes
+}                         // 64 bytes
+
+#[derive(Clone, Copy)]
+pub struct BVHNode
+{
+    pub bounds: AABB,
+    pub tri_count: usize,
+    pub left_first: usize,
+}
+
+impl BVHNode
+{
+    pub fn is_leaf(&self) -> bool
+    {
+        return self.tri_count > 0;
+    }
+}
+
+pub struct Clipped
+{
+    pub vertices: u32,
+    pub v: [Float3; 9],
+    pub bounds: AABB
+}
+
+impl Clipped
+{
+    pub fn new(triangle: &Triangle, bounding_box: &AABB) -> Self
+    {
+        let mut v = [Float3::zero(); 9];
+        v[0] = triangle.vertex0;
+        v[1] = triangle.vertex1;
+        v[2] = triangle.vertex2;
+        let mut vertices: usize = 3;
+
+        for a in 0..3
+        {
+            let mut ntmp = 0;
+            let mut tmp = [Float3::zero(); 9];
+            let mut C = Float3::zero();
+            let mut v0 = v[vertices - 1];
+            let mut v1 = Float3::zero();
+            let mut plane = bounding_box.minimal(a);
+            let mut x = (v0.get_axis(a) - plane) >= 0.0;
+            for i in 0..vertices
+            {
+                v1 = v[i];
+                let d0 = v0.get_axis(a) - plane;
+                let d1 = v1.get_axis(a) - plane;
+                if x && d1 >= 0.0
+                {
+                    /* both in */
+                    tmp[ntmp] = v1;
+                    ntmp += 1;
+                }
+                else if !x && d1 > 0.0
+                {
+                    // coming in: emit C and d1
+                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
+                    C.set_axis(a, plane);
+                    tmp[ntmp] = C;
+                    ntmp += 1;
+                    tmp[ntmp] = v1;
+                    ntmp += 1;
+                    x = true;
+                }
+                else if x && d1 < 0.0 // going out: emit C
+                {
+                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
+                    C.set_axis(a, plane);
+                    tmp[ntmp] = C;
+                    ntmp += 1;
+                    x = false;
+                }
+
+                v0 = v1;
+            }
+            vertices = 0;
+            if ntmp < 3
+            {
+                break;
+            }
+            v0 = tmp[ntmp - 1];
+            plane = bounding_box.maximal(a);
+            x = (plane - v0.get_axis(a)) >= 0.0;
+            for i in 0..ntmp
+            {
+                v1 = tmp[i];
+                let d0 = plane - v0.get_axis(a);
+                let d1 = plane - v1.get_axis(a);
+                if x && d1 >= 0.0
+                {
+                    /* both in */
+                    v[vertices] = v1;
+                    vertices += 1;
+                }
+                else if !x && d1 > 0.0
+                {
+                    // coming in: emit C and d1
+                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
+                    C.set_axis(a,plane);
+                    v[vertices] = C;
+                    vertices += 1;
+                    v[vertices] = v1;
+                    vertices += 1;
+                    x = true;
+                }
+                else if x && d1 < 0.0
+                {
+                    // going out: emit C
+                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
+                    C.set_axis(a,plane);
+                    v[vertices] = C;
+                    vertices += 1;
+                    x = false;
+                }
+
+                v0 = v1;
+            }
+            if vertices < 3
+            {
+                // nothing or degenerate
+                break;
+            }
+        }
+        // calculate bounding box
+        let mut bounds = AABB::from_empty();
+        for i in 0..vertices
+        {
+            bounds.grow(&v[i]);
+        }
+
+        Clipped
+        {
+            vertices: vertices as u32,
+            v,
+            bounds
+        }
+    }
+}
+
+pub struct BVH
+{
+    pub triangles: Vec<Triangle>,
+    pub bvh_nodes: Vec<BVHNode>,
+    pub triangle_idx: Vec<usize>,
+    pub triangle_tmp: Vec<usize>,
+    pub root_node_idx: usize,
+    pub nodes_used: usize,
+    pub triangle_ptr: usize,
+    pub spatial_splits: usize,
+    pub t: Mat4,
+    pub inv_t: Mat4,
+    pub normals: Vec<Float3>,
+    pub obj_idx: i32,
+    pub mat_idx: i32
+}
+
+const BVH_BINS: usize = 128;
+
+impl BVH
+{
+    pub fn from_mesh(mesh: &Mesh) -> Self
+    {
+        let prim_count = mesh.triangles.len();
+        let mut triangles: Vec<Triangle> = Vec::with_capacity(prim_count * 2);
+        let mut triangle_idx: Vec<usize> = Vec::with_capacity(prim_count * 2);
+        let mut triangle_tmp: Vec<usize> = Vec::with_capacity(prim_count * 2);
+
+        let mut tri_idx = 0;
+        for triangle in &mesh.triangles
+        {
+            let vertex0 = mesh.vertices[triangle[0]];
+            let vertex1 = mesh.vertices[triangle[1]];
+            let vertex2 = mesh.vertices[triangle[2]];
+
+            triangles.push(Triangle
+            {
+                bounds: AABB::from_empty(),
+                vertex0,
+                vertex1,
+                vertex2,
+                tri_idx,
+            });
+            triangle_idx.push(tri_idx as usize);
+            triangle_tmp.push(0);
+            tri_idx += 1;
+        }
+
+        // build bvh
+        let mut bvh_nodes: Vec<BVHNode> = Vec::with_capacity(prim_count * 4);
+
+        triangles.iter_mut().for_each(|triangle|
+        {
+            triangle.bounds = AABB::from_bounds(&triangle.vertex0, &triangle.vertex0);
+            triangle.bounds.grow(&triangle.vertex1);
+            triangle.bounds.grow(&triangle.vertex2);
+        });
+
+        let mut root = BVHNode {
+            left_first: 0,
+            tri_count: prim_count,
+            bounds: AABB::from_empty()
+        };
+
+        for triangle in &triangles
+        {
+            root.bounds.min_bound = root.bounds.min_bound.min(&triangle.bounds.min_bound);
+            root.bounds.max_bound = root.bounds.max_bound.max(&triangle.bounds.max_bound);
+        }
+
+        bvh_nodes.push(root);
+        for _ in 1..prim_count * 4
+        {
+            bvh_nodes.push(
+                BVHNode {
+                    left_first: 0,
+                    tri_count: 0,
+                    bounds: AABB::from_empty()
+                }
+            );
+        }
+
+        let root_node_idx: usize = 0;
+
+        let spatial_splits: usize = 0;
+
+        for _ in &mesh.triangles
+        {
+            triangles.push(Triangle
+            {
+                bounds: AABB::from_empty(),
+                vertex0: Float3::zero(),
+                vertex1: Float3::zero(),
+                vertex2: Float3::zero(),
+                tri_idx: 0,
+            });
+            triangle_idx.push(0);
+            triangle_tmp.push(0);
+        }
+
+        let mut bvh = BVH
+        {
+            triangles,
+            bvh_nodes,
+            triangle_idx,
+            triangle_tmp,
+            root_node_idx,
+            nodes_used: 2,
+            triangle_ptr: prim_count,
+            spatial_splits,
+            t: mesh.t,
+            inv_t: mesh.inv_t,
+            normals: mesh.triangle_normals.to_vec(),
+            obj_idx: mesh.obj_idx,
+            mat_idx: mesh.mat_idx
+        };
+
+        bvh.subdivide(root_node_idx, prim_count);
+        bvh.finalize_sbvh(0);
+
+        println!("SAH:            {}", bvh.get_total_sah(0));
+        println!("nodes:          {}", bvh.get_node_count(0));
+        println!("leafs:          {}", bvh.get_leaf_count(0));
+        println!("spatial splits: {}", bvh.spatial_splits);
+        println!("SAH cost:       {}", bvh.sah_cost(0));
+
+        return bvh;
+    }
+
+    fn get_total_sah(&self, node_idx: usize) -> f32
+    {
+        let node = &self.bvh_nodes[node_idx];
+        if node.is_leaf()
+        {
+            return node.bounds.area();
+        }
+        return self.get_total_sah(node.left_first) + self.get_total_sah(node.left_first + 1);
+    }
+
+    fn get_node_count(&self, node_idx: usize) -> u32
+    {
+        let node = &self.bvh_nodes[node_idx];
+        if node.is_leaf()
+        {
+            return 1;
+        }
+        return self.get_node_count(node.left_first) + self.get_node_count(node.left_first + 1) + 1;
+    }
+
+    fn get_leaf_count(&self, node_idx: usize) -> u32
+    {
+        let node = &self.bvh_nodes[node_idx];
+        if node.is_leaf()
+        {
+            return 1;
+        }
+        return self.get_leaf_count(node.left_first) + self.get_leaf_count(node.left_first + 1);
+    }
+
+    fn sah_cost(&self, node_idx: usize) -> f32
+    {
+        let node = &self.bvh_nodes[node_idx];
+        let area = node.bounds.area();
+        if node.is_leaf()
+        {
+            return area * (node.tri_count as f32);
+        }
+        let mut cost: f32 = 0.0;
+        cost += self.sah_cost(node.left_first);
+        cost += self.sah_cost(node.left_first + 1);
+        cost += area;
+        if (node_idx == 0)
+        {
+            cost *= 1.0 / area;
+        }
+        return cost;
+    }
+
+
+    fn intersect_triangle(&self, ray: &mut Ray, tri_idx: usize) -> bool
+    {
+        let triangle = &self.triangles[tri_idx];
+        let edge1 = triangle.vertex1 - triangle.vertex0;
+        let edge2 = triangle.vertex2 - triangle.vertex0;
+        let h = cross(&ray.direction, &edge2);
+        let a = dot(&edge1, &h);
+        if a  > -0.0001 && a < 0.0001
+        {
+            return false;
+        }
+        let s = ray.origin - triangle.vertex0;
+        let f = 1.0 / a;
+        let u = f * dot(&s, &h);
+        if u < 0.0 || u > 1.0
+        {
+            return false;
+        }
+        let q = cross(&s, &edge1);
+        let v = f * dot(&ray.direction, &q);
+        if v < 0.0 || u + v > 1.0
+        {
+            return false;
+        }
+        let t = f * dot(&edge2, &q);
+        if t > 0.0001 && t < ray.t
+        {
+            ray.t = t;
+            ray.sub_obj_idx = triangle.tri_idx as usize;
+            return true;
+        }
+        return false;
+    }
+
+    fn intersect_aabb(&self, ray: &Ray, aabb: &AABB) -> f32
+    {
+        let tx1 = (aabb.min_bound.x - ray.origin.x) * ray.r_direction.x;
+        let tx2 = (aabb.max_bound.x - ray.origin.x) * ray.r_direction.x;
+        let mut tmin = tx1.min(tx2);
+        let mut tmax = tx1.max(tx2);
+        let ty1 = (aabb.min_bound.y - ray.origin.y) * ray.r_direction.y;
+        let ty2 = (aabb.max_bound.y - ray.origin.y) * ray.r_direction.y;
+        tmin = tmin.max(ty1.min(ty2));
+        tmax = tmax.min(ty1.max(ty2));
+        let tz1 = (aabb.min_bound.z - ray.origin.z) * ray.r_direction.z;
+        let tz2 = (aabb.max_bound.z - ray.origin.z) * ray.r_direction.z;
+        tmin = tmin.max(tz1.min(tz2));
+        tmax = tmax.min(tz1.max(tz2));
+        if tmax >= tmin && tmin < ray.t && tmax > 0.0
+        {
+            return tmin;
+        }
+        return 1e30;
+    }
+
+    fn finalize_sbvh(&mut self, node_idx: usize)
+    {
+        let node = self.bvh_nodes[node_idx];
+        if node.is_leaf()
+        {
+            for i in 0..node.tri_count
+            {
+                let idx = self.triangle_idx[node.left_first + i];
+                self.triangle_idx[node.left_first + i] = self.triangles[idx].tri_idx as usize;
+            }
+            return;
+        }
+        self.finalize_sbvh(node.left_first);
+        self.finalize_sbvh(node.left_first + 1);
+    }
+
+    fn find_best_object_split_plane(&mut self, node: &BVHNode, axis: &mut usize, split_pos: &mut f32, l_box: &mut AABB, r_box: &mut AABB) -> f32
+    {
+        let mut best_cost: f32 = 1e30;
+        for a in 0..3
+        {
+            let mut bounds_min: f32 = 1e30;
+            let mut bounds_max: f32 = -1e30;
+            for i in 0..node.tri_count
+            {
+                let triangle = &self.triangles[self.triangle_idx[node.left_first + i]];
+
+                let triangle_center = triangle.bounds.center( a );
+                bounds_min = bounds_min.min( triangle_center );
+                bounds_max = bounds_max.max( triangle_center );
+            }
+            if bounds_min == bounds_max
+            {
+                continue;
+            }
+            // loop over split plane candidates
+            let bin_width = (bounds_max - bounds_min) / (BVH_BINS as f32);
+            for b in 1..BVH_BINS
+            {
+                let plane = bounds_min + bin_width * (b as f32);
+
+                let mut left_box = AABB::from_empty();
+                let mut right_box = AABB::from_empty();
+
+                let mut left_count: u32 = 0;
+                let mut right_count: u32 = 0;
+                for i in 0..node.tri_count
+                {
+                    let triangle = &self.triangles[self.triangle_idx[node.left_first + i]];
+                    if triangle.bounds.center( a ) < plane
+                    {
+                        left_box.grow_aabb( &triangle.bounds );
+                        left_count += 1;
+                    }
+                    else
+                    {
+                        right_box.grow_aabb( &triangle.bounds );
+                        right_count += 1;
+                    }
+                }
+                let plane_cost = (left_count as f32) * left_box.area() + (right_count as f32) * right_box.area();
+                if plane_cost < best_cost
+                {
+                    *axis = a;
+                    *split_pos = plane;
+                    best_cost = plane_cost;
+                    *l_box = left_box;
+                    *r_box = right_box;
+                }
+
+            }
+        }
+
+        return best_cost;
+    }
+
+    fn find_best_spatial_split_plane(&mut self, node: &BVHNode, axis: &mut usize, split_pos: &mut f32, n_left: &mut usize, n_right: &mut usize, bounds_left: &mut AABB, bounds_right: &mut AABB, splitted: &mut i32) -> f32
+    {
+        let mut best_cost = 1e30;
+        for a in 0..3
+        {
+            let bounds_min = node.bounds.min_bound.get_axis(a);
+            let bounds_max = node.bounds.max_bound.get_axis(a);
+            if bounds_min == bounds_max
+            {
+                continue;
+            }
+
+            // calculate cost of spatial splits
+            let bin_extend = (bounds_max - bounds_min) / (BVH_BINS as f32);
+            for b in 1..BVH_BINS
+            {
+                // calculate spatial split plane position
+                let pos = bounds_min + (b as f32) * bin_extend;
+                // construct left and right bounding box
+                let mut left_bounds = AABB::from_empty();
+                let mut right_bounds = AABB::from_empty();
+                let mut left_box = AABB::from_bounds(&node.bounds.min_bound, &node.bounds.max_bound);
+                let mut right_box = AABB::from_bounds(&node.bounds.min_bound, &node.bounds.max_bound);
+
+                left_box.max_bound.set_axis(a, pos);
+                right_box.min_bound.set_axis(a, pos);
+
+                let mut left_count: usize = 0;
+                let mut right_count: usize = 0;
+                // loop over triangles
+                for i in 0..node.tri_count
+                {
+                    // fetch a triangle
+                    let triangle = &self.triangles[self.triangle_idx[node.left_first + i]];
+
+                    // extend left and right side
+                    let left_triangle = Clipped::new(&triangle, &left_box);
+
+                    if left_triangle.vertices > 2
+                    {
+                        left_bounds.grow_aabb( &left_triangle.bounds );
+                        left_count += 1;
+                    }
+
+                    let right_triangle = Clipped::new(&triangle, &right_box);
+
+                    if right_triangle.vertices > 2
+                    {
+                        right_bounds.grow_aabb( &right_triangle.bounds );
+                        right_count += 1;
+                    }
+                }
+                // calculate cost for this split plane
+                if left_count > 0 && right_count > 0
+                {
+                    let zero: f32 = 0.0;
+                    let cost = zero.max(left_bounds.area()) * (left_count as f32) + zero.max(right_bounds.area()) * (right_count as f32);
+
+                    if cost < best_cost
+                    {
+                        *axis = a;
+                        best_cost = cost;
+                        *split_pos = pos;
+
+                        *splitted = ((right_count + left_count) as i32) - (node.tri_count as i32);
+                        *n_left = left_count;
+                        *n_right = right_count;
+                        *bounds_left = left_bounds;
+                        *bounds_right = right_bounds;
+                    }
+
+                }
+            }
+        }
+        return best_cost;
+    }
+
+    fn calculate_node_cost(node: &BVHNode) -> f32
+    {
+        let e = node.bounds.max_bound - node.bounds.min_bound;
+        let area = e.x * e.y + e.y * e.z + e.z * e.x;
+        return (node.tri_count as f32) * area;
+    }
+
+    fn subdivide(&mut self, node_idx: usize, slack: usize)
+    {
+        let node = self.bvh_nodes[node_idx].clone();
+        let mut obj_split_axis: usize = 0;
+        let mut spatial_split_axis: usize = 0;
+        let mut splitted: i32 = 0;
+        let mut left_box = AABB::from_empty();
+        let mut right_box = AABB::from_empty();
+
+        let mut obj_split_pos: f32 = 0.0;
+        let mut spatial_split_pos: f32 = 0.0;
+        let no_split_cost: f32 = BVH::calculate_node_cost(&node);
+
+        let mut obj_split_cost = self.find_best_object_split_plane(&node, &mut obj_split_axis, &mut obj_split_pos, &mut left_box, &mut right_box);
+
+        let root_area = self.bvh_nodes[0].bounds.area();
+        let lambda = left_box.intersection( &right_box ).area() / root_area;
+
+        if lambda > 1e-5
+        {
+            let mut n_left: usize = 0;
+            let mut n_right: usize = 0;
+            let mut bounds_left = AABB::from_empty();
+            let mut bounds_right = AABB::from_empty();
+
+            let mut spatial_split_cost = self.find_best_spatial_split_plane(&node, &mut spatial_split_axis, &mut spatial_split_pos, &mut n_left, &mut n_right, &mut bounds_left, &mut bounds_right, &mut splitted);
+
+            if spatial_split_cost < obj_split_cost && splitted < (slack as i32)
+            {
+                if spatial_split_cost >= no_split_cost
+                {
+                    return; // don't split, not worth it
+                }
+                let mut left_of_split = node.bounds.clone();
+                let mut right_of_split = node.bounds.clone();
+                left_of_split.max_bound.set_axis(spatial_split_axis, spatial_split_pos);
+                right_of_split.min_bound.set_axis(spatial_split_axis, spatial_split_pos);
+
+                let mut left_pos = node.left_first;
+                let mut left_count: usize = 0;
+                let mut right_pos = node.left_first + node.tri_count + slack;
+                let mut right_count: usize = 0;
+
+                for i in 0..node.tri_count
+                {
+                    let mut idx = self.triangle_idx[node.left_first + i];
+                    let mut left_part = Clipped::new(&self.triangles[idx], &left_of_split);
+                    let mut right_part = Clipped::new(&self.triangles[idx], &right_of_split);
+                    let mut in_left = left_part.vertices >= 3;
+                    let mut in_right = right_part.vertices >= 3;
+
+                    if in_left && in_right
+                    {
+                        let c1 = bounds_left.union(&self.triangles[idx].bounds).area() * (n_left as f32) + bounds_right.area() * ((n_right - 1) as f32);
+                        let c2 = bounds_left.area() * ((n_left - 1) as f32) + bounds_right.union( &self.triangles[idx].bounds ).area() * (n_right as f32);
+                        if c1 < spatial_split_cost || c2 < spatial_split_cost
+                        {
+                            if c1 < c2
+                            {
+                                spatial_split_cost = c1;
+                                n_right -= 1;
+                                bounds_left.grow_aabb( &self.triangles[idx].bounds );
+                                left_part.bounds = self.triangles[idx].bounds;
+                                in_right = false; // undo clip
+                            }
+                            else {
+                                spatial_split_cost = c2;
+                                n_left -= 1;
+                                bounds_right.grow_aabb( &self.triangles[idx].bounds );
+                                right_part.bounds = self.triangles[idx].bounds;
+                                in_left = false; // undo clip
+                            }
+                        }
+                    }
+
+                    if in_left
+                    {
+                        self.triangle_idx[left_pos] = idx;
+                        left_pos += 1;
+                        self.triangles[idx].bounds = left_part.bounds;
+                        left_count += 1;
+                    }
+                    if in_right
+                    {
+                        if in_left
+                        {
+                            self.triangles[self.triangle_ptr] = self.triangles[idx].clone();
+                            idx = self.triangle_ptr;
+                            self.triangle_ptr += 1;
+                        }
+                        right_pos -= 1;
+                        self.triangle_tmp[right_pos] = idx;
+                        self.triangles[idx].bounds = right_part.bounds;
+                        right_count += 1;
+                    }
+                }
+
+                let slack = ((slack as i32) - splitted) as usize;
+                let half_slack = slack / 2;
+
+                let triangle_idx_adr = node.left_first + left_count + half_slack;
+                let triangle_tmp_adr = right_pos;
+
+                for i in 0..right_count
+                {
+                    self.triangle_idx[triangle_idx_adr + i] = self.triangle_tmp[triangle_tmp_adr + i];
+                }
+
+                let left_child_idx = self.nodes_used;
+                self.nodes_used += 1;
+                let right_child_idx = self.nodes_used;
+                self.nodes_used += 1;
+
+                self.bvh_nodes[left_child_idx].left_first = node.left_first;
+                self.bvh_nodes[left_child_idx].tri_count = left_count;
+                self.bvh_nodes[right_child_idx].left_first = node.left_first + left_count + half_slack;
+                self.bvh_nodes[right_child_idx].tri_count = right_count;
+
+                self.bvh_nodes[node_idx].left_first = left_child_idx;
+                self.bvh_nodes[node_idx].tri_count = 0;
+
+                self.bvh_nodes[left_child_idx].bounds = bounds_left;
+                self.bvh_nodes[right_child_idx].bounds = bounds_right;
+                self.spatial_splits += 1;
+                self.subdivide(left_child_idx, half_slack);
+                self.subdivide(right_child_idx, half_slack);
+                return;
+            }
+        }
+        if obj_split_cost >= no_split_cost
+        {
+            return;
+        }
+
+        let mut i = node.left_first;
+        let mut j: i32 = ((i + node.tri_count) as i32) - 1;
+
+        while (i as i32) <= j
+        {
+            let jx = j as usize;
+            let triangle = &self.triangles[self.triangle_idx[i]];
+            if triangle.bounds.center(obj_split_axis) < obj_split_pos
+            {
+                i += 1;
+            }
+            else {
+                if i != jx
+                {
+                    self.triangle_idx.swap(i, jx);
+                }
+                j -= 1;
+            }
+        }
+
+        let half_slack = slack / 2;
+        let left_count = i - node.left_first;
+        if left_count == 0 || left_count == node.tri_count
+        {
+            return;
+        }
+
+        if half_slack > 0
+        {
+            let lb = i;
+            let ub = i + (node.tri_count - left_count);
+            self.triangle_idx.copy_within((lb..ub), i + half_slack);
+        }
+
+        let left_child_idx = self.nodes_used;
+        self.nodes_used += 1;
+        let right_child_idx = self.nodes_used;
+        self.nodes_used += 1;
+        self.bvh_nodes[left_child_idx].left_first = node.left_first;
+        self.bvh_nodes[left_child_idx].tri_count = left_count;
+        self.bvh_nodes[right_child_idx].left_first = i + half_slack;
+        self.bvh_nodes[right_child_idx].tri_count = node.tri_count - left_count;
+
+        self.bvh_nodes[node_idx].left_first = left_child_idx;
+        self.bvh_nodes[node_idx].tri_count = 0;
+
+        self.bvh_nodes[left_child_idx].bounds = left_box;
+        self.bvh_nodes[right_child_idx].bounds = right_box;
+        self.subdivide(left_child_idx, half_slack);
+        self.subdivide(right_child_idx, half_slack);
+    }
+}
+
+impl RayHittableObject for BVH
+{
+    fn intersect(&self, ray: &mut Ray) {
+        let O = transform_position( &ray.origin, &self.inv_t );
+        let D = transform_vector( &ray.direction, &self.inv_t );
+
+        let mut ray_t = Ray::directed_distance(O, D, ray.t);
+        ray_t.obj_idx = ray.obj_idx;
+
+        let mut node = &self.bvh_nodes[self.root_node_idx];
+        let mut stack = [BVHNode{
+            bounds: AABB::from_empty(),
+            tri_count: 0,
+            left_first: 0
+        }; 64];
+
+        let mut stack_ptr: usize = 0;
+        loop
+        {
+            if node.is_leaf()
+            {
+                for i in 0..node.tri_count
+                {
+                    if self.intersect_triangle(&mut ray_t, self.triangle_idx[node.left_first + i])
+                    {
+                        ray.obj_idx = self.obj_idx;
+                        ray.obj_type = RayHittableObjectType::Bvh;
+                    }
+                }
+
+                if stack_ptr == 0
+                {
+                    break;
+                }
+                else
+                {
+                    stack_ptr -= 1;
+                    node = &stack[stack_ptr];
+                }
+                continue;
+            }
+            let mut child1 = &self.bvh_nodes[node.left_first];
+            let mut child2 = &self.bvh_nodes[node.left_first + 1];
+            let mut dist1 = self.intersect_aabb( &ray_t, &child1.bounds );
+            let mut dist2 = self.intersect_aabb( &ray_t, &child2.bounds );
+            if dist1 > dist2
+            {
+                let tmp = dist1;
+                dist1 = dist2;
+                dist2 = tmp;
+                let tmp = child1;
+                child1 = child2;
+                child2 = tmp;
+            }
+            if dist1 == 1e30
+            {
+                if stack_ptr == 0
+                {
+                    break;
+                }
+                else
+                {
+                    stack_ptr -= 1;
+                    node = &stack[stack_ptr];
+                }
+                continue;
+            }
+            node = child1;
+            if dist2 != 1e30
+            {
+                stack[stack_ptr] = *child2;
+                stack_ptr += 1;
+            }
+        }
+        ray.t = ray_t.t;
+        ray.sub_obj_idx = ray_t.sub_obj_idx;
+    }
+
+    fn get_normal(&self, i: &Float3) -> Float3 {
+        return self.normals[0];
+    }
+
+    fn get_uv(&self, i: &Float3) -> Float2 {
+        return Float2::zero();
+    }
+
+    fn is_occluded(&self, ray: &Ray) -> bool {
+        let mut shadow = ray.clone();
+        shadow.t = 1e34;
+        shadow.obj_idx = i32::MAX;
+        self.intersect(&mut shadow);
+        return shadow.obj_idx == i32::MAX;
+    }
+}
+
+
 pub struct Mesh
 {
     pub vertices: Vec<Float3>,
@@ -835,26 +1662,39 @@ pub struct Mesh
     pub triangle_normals: Vec<Float3>,
     pub obj_idx: i32,
     pub mat_idx: i32,
+    pub t: Mat4,
+    pub inv_t: Mat4
 }
 
 impl Mesh
 {
-    fn triangle(obj_idx: i32, mat_idx: i32) -> Self
+    pub fn from_tri_file(obj_idx: i32, mat_idx: i32, transform: Mat4, path: &std::path::Path) -> Self
     {
-        let vertices = vec![Float3::from_xyz(0.0, 0.0, 1.5), Float3::from_xyz(1.0, 0.0, 1.5), Float3::from_xyz(0.0, 1.0, 1.8)];
-        let triangles = vec![[0,2,1]];
+        let mut vertices = Vec::new();
+        let mut triangles = Vec::new();
+        let contents = std::fs::read_to_string(path).expect("Could not find file");
+        let lines = contents.split("\n");
 
-        let mut triangle_normals: Vec<Float3> = Vec::with_capacity(triangles.len());
-        for triangle in &triangles
-        {
-            let v0 = vertices[triangle[0]];
-            let v1 = vertices[triangle[1]];
-            let v2 = vertices[triangle[2]];
+        for line in std::fs::read_to_string(path).expect("Could not find file").lines() {
+            let floats = line.split(" ");
 
-            let v0v1 = v1 - v0;
-            let v0v2 = v2 - v0;
-            triangle_normals.push(normalize(&cross(&v0v1, &v0v2)));
+            let mut raw_floats: [f32; 9] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+            let mut index = 0;
+            for float in floats
+            {
+                raw_floats[index] = float.parse::<f32>().unwrap();
+                index += 1;
+            }
+
+            let vertices_index = vertices.len();
+            vertices.push(Float3::from_xyz(raw_floats[0], raw_floats[1], raw_floats[2]));
+            vertices.push(Float3::from_xyz(raw_floats[3], raw_floats[4], raw_floats[5]));
+            vertices.push(Float3::from_xyz(raw_floats[6], raw_floats[7], raw_floats[8]));
+
+            triangles.push([vertices_index, vertices_index + 1, vertices_index + 2])
         }
+
+        let triangle_normals = Mesh::compute_normals(&triangles, &vertices, &transform);
 
         Mesh
         {
@@ -862,18 +1702,49 @@ impl Mesh
             triangles,
             triangle_normals,
             obj_idx,
-            mat_idx
+            mat_idx,
+            t: transform,
+            inv_t: transform.inverted()
         }
     }
 
-    fn intersect_triangle(&self, ray: &mut Ray, vertex0: usize, vertex1: usize, vertex2: usize, triangle_index: usize)
+    pub fn triangle(obj_idx: i32, mat_idx: i32, transform: Mat4) -> Self
     {
-        // cull if not facing in direction of normal, check if correct
-        if dot(&self.triangle_normals[triangle_index], &ray.direction) > 0.0
-        {
-            return;
-        }
+        let vertices = vec![Float3::from_xyz(0.0, 0.0, 0.0), Float3::from_xyz(1.0, 0.0, 0.0), Float3::from_xyz(0.0, 1.0, 0.3)];
+        let triangles = vec![[0,2,1]];
 
+        let triangle_normals = Mesh::compute_normals(&triangles, &vertices, &transform);
+
+        Mesh
+        {
+            vertices,
+            triangles,
+            triangle_normals,
+            obj_idx,
+            mat_idx,
+            t: transform,
+            inv_t: transform.inverted()
+        }
+    }
+
+    fn compute_normals(triangles: &Vec<[usize; 3]>, vertices: &Vec<Float3>, transform: &Mat4) -> Vec<Float3>
+    {
+        let mut triangle_normals: Vec<Float3> = Vec::with_capacity(triangles.len());
+        for triangle in triangles
+        {
+            let v0 = vertices[triangle[0]];
+            let v1 = vertices[triangle[1]];
+            let v2 = vertices[triangle[2]];
+
+            let v0v1 = v1 - v0;
+            let v0v2 = v2 - v0;
+            triangle_normals.push(normalize(&transform_vector(&cross(&v0v1, &v0v2), transform)));
+        }
+        return triangle_normals;
+    }
+
+    fn intersect_triangle(&self, ray: &mut Ray, vertex0: usize, vertex1: usize, vertex2: usize, triangle_index: usize) -> bool
+    {
         let v0 = self.vertices[vertex0];
         let v1 = self.vertices[vertex1];
         let v2 = self.vertices[vertex2];
@@ -885,7 +1756,7 @@ impl Mesh
         // cull backsides
         if det < EPSILON
         {
-            return;
+            return false;
         }
 
         let inv_det = 1.0 / det;
@@ -894,24 +1765,24 @@ impl Mesh
         let u = dot(&tvec, &pvec) * inv_det;
         if u < 0.0 || u > 1.0
         {
-            return;
+            return false;
         }
 
         let qvec = cross( &tvec, &v0v1);
         let v = dot(&ray.direction, &qvec) * inv_det;
         if v < 0.0 || u + v > 1.0
         {
-            return;
+            return false;
         }
 
         let t = dot(&v0v2, &qvec) * inv_det;
         if t > 0.0 && t < ray.t
         {
-            ray.obj_idx = self.obj_idx;
             ray.t = dot(&v0v2, &qvec) * inv_det;
-            ray.obj_type = RayHittableObjectType::Mesh;
             ray.sub_obj_idx = triangle_index;
+            return true;
         }
+        return false;
     }
 
     fn is_occluded_triangle(&self, ray: &Ray, vertex0: usize, vertex1: usize, vertex2: usize) -> bool
@@ -954,9 +1825,21 @@ impl Mesh
 impl RayHittableObject for Mesh
 {
     fn intersect(&self, ray: &mut Ray) {
+        let origin = transform_position(&ray.origin, &self.inv_t );
+        let direction = transform_vector(&ray.direction, &self.inv_t );
+
+        let mut ray_t = Ray::directed_distance(origin, direction, ray.t);
+        ray_t.obj_idx = ray.obj_idx;
+
         for (triangle_index, triangle) in self.triangles.iter().enumerate()
         {
-            self.intersect_triangle(ray, triangle[0], triangle[1], triangle[2], triangle_index);
+            if self.intersect_triangle(&mut ray_t, triangle[0], triangle[1], triangle[2], triangle_index)
+            {
+                ray.obj_idx = self.obj_idx;
+                ray.sub_obj_idx = ray_t.sub_obj_idx;
+                ray.t = ray_t.t;
+                ray.obj_type = RayHittableObjectType::Mesh;
+            }
         }
     }
 
@@ -992,6 +1875,7 @@ pub struct Scene
     tori: Vec<Torus>,
     quads: Vec<Quad>,
     meshes: Vec<Mesh>,
+    bvhs: Vec<BVH>,
     materials: Vec<Material>,
     animation_time: f32,
 }
@@ -1004,6 +1888,14 @@ impl Scene
         let translation = Float3::from_xyz(-0.25, 0.0, 2.0);
         torus.t = Mat4::translate(&translation) * Mat4::rotate_x(PI / 4.0);
         torus.inv_t = torus.t.inverted();
+
+        let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 2.5)) * Mat4::scale(0.5);
+        let triangle_mesh = Mesh::triangle(0, 6, transform);
+        let triangle_bvh = BVH::from_mesh(&triangle_mesh);
+
+        let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, -1.0)) * Mat4::scale(0.5);
+        let unity_mesh = Mesh::from_tri_file(1, 8, transform, std::path::Path::new("./assets/unity.tri"));
+        let unity_bvh = BVH::from_mesh(&unity_mesh);
 
         Scene{
             spheres: vec![
@@ -1031,7 +1923,11 @@ impl Scene
                 Quad::new(3, 0, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, 1.0))),
             ],
             meshes: vec![
-                Mesh::triangle(0, 6)
+                //triangle_mesh
+            ],
+            bvhs: vec![
+                triangle_bvh,
+                unity_bvh
             ],
             materials: vec![
                 linear_color(Float3::from_a(1.0)),
@@ -1081,6 +1977,11 @@ impl Scene
         for mesh in &self.meshes
         {
             mesh.intersect(ray);
+        }
+
+        for bvhs in &self.bvhs
+        {
+            bvhs.intersect(ray);
         }
     }
 
@@ -1243,6 +2144,10 @@ impl Scene
             {
                 self.quads[obj_idx].get_normal(i)
             }
+            RayHittableObjectType::Bvh =>
+            {
+                self.bvhs[obj_idx].get_normal(i)
+            }
         };
 
         if dot(&normal, &wo) > 0.0
@@ -1285,6 +2190,10 @@ impl Scene
             RayHittableObjectType::Torus =>
             {
                 self.tori[obj_idx as usize].mat_idx
+            },
+            RayHittableObjectType::Bvh =>
+            {
+                self.bvhs[obj_idx as usize].mat_idx
             }
         };
         &self.materials[mat_idx as usize]
@@ -1324,6 +2233,10 @@ impl Scene
             RayHittableObjectType::Torus =>
             {
                 self.tori[obj_idx].get_uv(i)
+            },
+            RayHittableObjectType::Bvh =>
+            {
+                self.bvhs[obj_idx].get_uv(i)
             }
         }
     }
@@ -1362,6 +2275,10 @@ impl Scene
             RayHittableObjectType::Torus =>
             {
                 self.tori[obj_idx].intersect(ray)
+            },
+            RayHittableObjectType::Bvh =>
+            {
+                self.bvhs[obj_idx].intersect(ray)
             }
         }
     }

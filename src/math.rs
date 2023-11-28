@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+
+use std::cmp::max;
 use std::ops::*;
 
 pub const EPSILON: f32 = 0.00005;
@@ -136,6 +138,26 @@ impl Float3 {
 
     pub fn from_a(a: f32) -> Self {
         Float3 { x: a, y: a, z: a }
+    }
+
+    pub fn get_axis(&self, axis: usize) -> f32
+    {
+        match axis {
+            0 => self.x,
+            1 => self.y,
+            2 => self.z,
+            _ => panic!("outside of bounds in get_axis()")
+        }
+    }
+
+    pub fn set_axis(&mut self, axis: usize, value: f32)
+    {
+        match axis {
+            0 => self.x = value,
+            1 => self.y = value,
+            2 => self.z = value,
+            _ => panic!("outside of bounds in set_axis()")
+        }
     }
 }
 
@@ -1359,6 +1381,16 @@ impl Mat4
     }
 
     #[inline(always)]
+    pub fn scale(p: f32) -> Self
+    {
+        let mut ret_val = Mat4::identity_matrix();
+        ret_val.cell[0] = p;
+        ret_val.cell[5] = p;
+        ret_val.cell[10] = p;
+        return ret_val;
+    }
+
+    #[inline(always)]
     pub fn inverted(&self) -> Mat4
     {
         let inv = [
@@ -1504,6 +1536,7 @@ pub fn rgbf32_to_rgb8_f3(value: &Float3) -> u32
     return (r << 16) + (g << 8) + b;
 }
 
+#[derive(Clone, Copy)]
 pub struct AABB
 {
     pub min_bound: Float3,
@@ -1517,6 +1550,14 @@ impl AABB
         AABB{
             min_bound: Float3::from_a(1e34),
             max_bound: Float3::from_a(-1e34)
+        }
+    }
+
+    pub fn from_bounds(min_bound: &Float3, max_bound: &Float3) -> Self
+    {
+        AABB{
+            min_bound: *min_bound,
+            max_bound: *max_bound
         }
     }
 
@@ -1537,7 +1578,7 @@ impl AABB
     pub fn grow_aabb(&mut self, bb: &AABB)
     {
         self.min_bound = self.min_bound.min(&bb.min_bound);
-        self.max_bound = self.min_bound.max(&bb.max_bound);
+        self.max_bound = self.max_bound.max(&bb.max_bound);
     }
 
     pub fn grow(&mut self, vector: &Float3)
@@ -1600,25 +1641,32 @@ impl AABB
     {
         match axis
         {
-            0 => self.center_x(),
-            1 => self.center_y(),
-            2 => self.center_z(),
+            0 => (self.min_bound.x + self.max_bound.x) * 0.5,
+            1 => (self.min_bound.y + self.max_bound.y) * 0.5,
+            2 => (self.min_bound.z + self.max_bound.z) * 0.5,
             _ => panic!("Outside of axis range")
         }
     }
 
-    pub fn center_x(&self) -> f32
+    pub fn minimal(&self, axis: usize) -> f32
     {
-        return (self.min_bound.x + self.max_bound.x) * 0.5;
+        match axis
+        {
+            0 => self.min_bound.x,
+            1 => self.min_bound.y,
+            2 => self.min_bound.z,
+            _ => panic!("Outside of axis range")
+        }
     }
 
-    pub fn center_y(&self) -> f32
+    pub fn maximal(&self, axis: usize) -> f32
     {
-        return (self.min_bound.y + self.max_bound.y) * 0.5;
-    }
-
-    pub fn center_z(&self) -> f32
-    {
-        return (self.min_bound.z + self.max_bound.z) * 0.5;
+        match axis
+        {
+            0 => self.max_bound.x,
+            1 => self.max_bound.y,
+            2 => self.max_bound.z,
+            _ => panic!("Outside of axis range")
+        }
     }
 }
