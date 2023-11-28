@@ -1007,7 +1007,7 @@ impl Scene
 
         Scene{
             spheres: vec![
-                Sphere::new(0, 9, Float3::from_a(0.0), 0.3),
+                Sphere::new(0, 11, Float3::from_a(0.0), 0.3),
                 Sphere::new(1, 0, Float3::from_xyz( 0.0, 2.5, -3.07 ), 8.0)
             ],
             planes: vec![
@@ -1045,6 +1045,7 @@ impl Scene
                 linear_color(Float3::from_xyz(0.0, 0.0, 1.0)),
                 reflective_material(linear_color_simple(Float3::from_a(1.0)), 0.02),
                 fully_reflective_material(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0))),
+                refractive_material_with_exit(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0)), 1.5, 10.0),
             ],
             animation_time: 0.0
         }
@@ -1323,6 +1324,44 @@ impl Scene
             RayHittableObjectType::Torus =>
             {
                 self.tori[obj_idx].get_uv(i)
+            }
+        }
+    }
+
+    pub fn intersect_object(&self, ray: &mut Ray, obj_idx: usize, obj_type: RayHittableObjectType)
+    {
+        let obj_idx = obj_idx as usize;
+        let obj_type = obj_type;
+        match obj_type
+        {
+            RayHittableObjectType::None =>
+            {
+
+            },
+            RayHittableObjectType::Sphere =>
+            {
+                self.spheres[obj_idx].intersect(ray);
+            },
+            RayHittableObjectType::Plane =>
+            {
+                self.planes[obj_idx].intersect(ray)
+            },
+            RayHittableObjectType::Cube =>
+            {
+                self.cubes[obj_idx].intersect(ray)
+            },
+            RayHittableObjectType::Quad =>
+            {
+                self.quads[obj_idx].intersect(ray)
+            },
+            RayHittableObjectType::Mesh =>
+            {
+                // should get uv from triangle
+                self.meshes[obj_idx].intersect(ray)
+            },
+            RayHittableObjectType::Torus =>
+            {
+                self.tori[obj_idx].intersect(ray)
             }
         }
     }

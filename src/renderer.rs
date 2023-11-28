@@ -128,6 +128,50 @@ impl Renderer
                 let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, reflection_material);
                 return (material_color) * Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
             }
+            Material::RefractiveMaterialWithExit(refractive_material, n2, absorption) =>
+            {
+                // assumes no collisions with any other objects, so a full glass ball with no objects inside
+
+                let normal = scene.get_normal(ray, &intersection, &ray.direction);
+                let reversed_dir = -ray.direction;
+                let theta1 = dot( &normal, &reversed_dir);
+                let theta1_2 = theta1 * theta1;
+                let n1n2 = 1.0 / n2; // div by 1
+                let n1n2_2 = n1n2 * n1n2;
+
+                let k = 1.0 - n1n2_2 * (1.0 - theta1_2);
+
+                if k < 0.0
+                {
+                    // do reflection
+                }
+
+                let refract_direction = (n1n2 * ray.direction) + (normal * (n1n2 * theta1_2 - k.sqrt()));
+                let refract_direction = normalize(&refract_direction);
+                let mut refract_ray = Ray::directed(intersection + EPSILON * refract_direction, refract_direction);
+
+                // only do self intersection
+                scene.intersect_object(&mut refract_ray, ray.obj_idx as usize, ray.obj_type);
+                let refract_normal = scene.get_normal(&refract_ray, &intersection, &refract_direction);
+                let reversed_refract_dir = -refract_direction;
+                let theta1 = dot (&refract_normal, &reversed_refract_dir);
+                let theta1_2 = theta1 * theta1;
+                let n2n1 = *n2;
+                let n2n1_2 = n2n1 * n2n1;
+
+                let k = 1.0 - n2n1_2 * (1.0 - theta1_2);
+
+                let new_direction = (n2n1 * refract_direction) + (refract_normal * (n2n1 * theta1_2 - k.sqrt()));
+                let new_direction = normalize(&new_direction);
+                let refract_intersection = refract_ray.intersection_point();
+
+                let mut new_ray = Ray::directed(refract_intersection + EPSILON * new_direction, new_direction);
+                let material_color = Float3::from_a(1.0) - Self::get_color_from_simple_material(ray, scene, &intersection, refractive_material);
+
+                let absorption_vector = Float3::from_xyz((-material_color.x * refract_ray.t * absorption).exp(), (-material_color.y * refract_ray.t * absorption).exp(), (-material_color.z * refract_ray.t * absorption).exp());
+
+                return (absorption_vector) * Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
+            }
             _ =>
             {
                 return Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);

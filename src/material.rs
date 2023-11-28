@@ -20,7 +20,9 @@ pub enum Material
 {
     Simple (SimpleMaterial),
     FullyReflectiveMaterial (SimpleMaterial),
-    ReflectiveMaterial (SimpleMaterial, f32),
+    ReflectiveMaterial (SimpleMaterial, f32  /* reflectivity */),
+    RefractiveMaterial (SimpleMaterial /* material */, f32 /* n1/n2 */, f32 /* absorption rate */),
+    RefractiveMaterialWithExit (SimpleMaterial /* material */, f32 /* n1/n2 */, f32 /* absorption rate */),
 }
 
 fn get_color_from_pixel(pixel: u32) -> Float3
@@ -90,6 +92,8 @@ pub fn get_simple_material(material: &Material) -> &SimpleMaterial
         Material::Simple(simple_material) => simple_material,
         Material::ReflectiveMaterial(simple_material, _) => simple_material,
         Material::FullyReflectiveMaterial(simple_material) => simple_material,
+        Material::RefractiveMaterial(simple_material, _, _) => simple_material,
+        Material::RefractiveMaterialWithExit(simple_material, _, _) => simple_material,
     }
 }
 
@@ -146,6 +150,16 @@ pub fn logo_material() -> Material
 pub fn reflective_material(material: SimpleMaterial, reflectivity: f32) -> Material
 {
     Material::ReflectiveMaterial(material, reflectivity)
+}
+
+pub fn refractive_material(material: SimpleMaterial, n1n2: f32, absorption: f32) -> Material
+{
+    Material::RefractiveMaterial(material, n1n2, absorption)
+}
+
+pub fn refractive_material_with_exit(material: SimpleMaterial, n2: f32, absorption: f32) -> Material
+{
+    Material::RefractiveMaterialWithExit(material, n2, absorption)
 }
 
 pub fn fully_reflective_material(material: SimpleMaterial) -> Material
