@@ -64,7 +64,7 @@ impl RayHittableObject for Cube
         }
     }
 
-    fn get_normal(&self, i: &Float3) -> Float3 {
+    fn get_normal(&self, _: &Ray, i: &Float3) -> Float3 {
         let obj_i = transform_position(&i, &self.inv_m);
         let mut n = Float3::from_xyz(-1.0, 0.0, 0.0);
         let d0 = (obj_i.x - self.b[0].x).abs();

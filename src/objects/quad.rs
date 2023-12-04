@@ -75,7 +75,7 @@ impl RayHittableObject for Quad
         }
     }
 
-    fn get_normal(&self, i: &Float3) -> Float3 {
+    fn get_normal(&self, _: &Ray, i: &Float3) -> Float3 {
         Float3::from_xyz(-self.t.cell[1], -self.t.cell[5], -self.t.cell[9])
     }
 

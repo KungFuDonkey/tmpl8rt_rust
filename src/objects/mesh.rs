@@ -189,9 +189,9 @@ impl RayHittableObject for Mesh
         }
     }
 
-    fn get_normal(&self, i: &Float3) -> Float3 {
+    fn get_normal(&self, ray: &Ray, i: &Float3) -> Float3 {
         // needs to interpolate between normals
-        self.triangle_normals[0]
+        self.triangle_normals[ray.sub_obj_idx]
     }
 
     fn get_uv(&self, i: &Float3) -> Float2 {

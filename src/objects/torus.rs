@@ -188,7 +188,7 @@ impl RayHittableObject for Torus
         }
     }
 
-    fn get_normal(&self, i: &Float3) -> Float3 {
+    fn get_normal(&self, _: &Ray, i: &Float3) -> Float3 {
         let l = transform_position(&i, &self.inv_t );
         let x = l * (- self.rc2 * Float3::from_xyz(1.0, 1.0, -1.0 ) + dot(&l, &l) - self.rt2);
         let n = normalize( &x );

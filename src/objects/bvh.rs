@@ -810,8 +810,8 @@ impl RayHittableObject for BVH
         ray.sub_obj_idx = ray_t.sub_obj_idx;
     }
 
-    fn get_normal(&self, i: &Float3) -> Float3 {
-        return self.normals[0];
+    fn get_normal(&self, ray: &Ray, i: &Float3) -> Float3 {
+        return self.normals[ray.sub_obj_idx];
     }
 
     fn get_uv(&self, i: &Float3) -> Float2 {

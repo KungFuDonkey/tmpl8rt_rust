@@ -82,7 +82,7 @@ pub trait RayHittableObject
 {
     fn intersect(&self, ray: &mut Ray);
 
-    fn get_normal(&self, i: &Float3) -> Float3;
+    fn get_normal(&self, ray: &Ray, i: &Float3) -> Float3;
 
     fn get_uv(&self, i: &Float3) -> Float2;
 

@@ -68,7 +68,7 @@ impl RayHittableObject for Plane
         }
     }
 
-    fn get_normal(&self, _: &Float3) -> Float3 {
+    fn get_normal(&self, _: &Ray, _: &Float3) -> Float3 {
         return self.normal;
     }
 

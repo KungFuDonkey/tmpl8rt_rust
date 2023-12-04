@@ -265,31 +265,31 @@ impl Scene
             },
             RayHittableObjectType::Sphere =>
             {
-                self.spheres[obj_idx].get_normal(i)
+                self.spheres[obj_idx].get_normal(ray, i)
             },
             RayHittableObjectType::Plane =>
             {
-                self.planes[obj_idx].get_normal(i)
+                self.planes[obj_idx].get_normal(ray, i)
             },
             RayHittableObjectType::Cube =>
             {
-                self.cubes[obj_idx].get_normal(i)
+                self.cubes[obj_idx].get_normal(ray, i)
             },
             RayHittableObjectType::Torus =>
             {
-                self.tori[obj_idx].get_normal(i)
+                self.tori[obj_idx].get_normal(ray, i)
             },
             RayHittableObjectType::Mesh =>
             {
-                self.meshes[obj_idx].triangle_normals[ray.sub_obj_idx]
+                self.meshes[obj_idx].get_normal(ray, i)
             },
             RayHittableObjectType::Quad =>
             {
-                self.quads[obj_idx].get_normal(i)
+                self.quads[obj_idx].get_normal(ray, i)
             }
             RayHittableObjectType::Bvh =>
             {
-                self.bvhs[obj_idx].get_normal(i)
+                self.bvhs[obj_idx].get_normal(ray, i)
             }
         };
 

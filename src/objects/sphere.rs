@@ -49,7 +49,7 @@ impl RayHittableObject for Sphere
         }
     }
 
-    fn get_normal(&self, i: &Float3) -> Float3 {
+    fn get_normal(&self, _: &Ray, i: &Float3) -> Float3 {
         return (*i - self.position) * self.inv_radius;
     }
 
