@@ -32,12 +32,15 @@ pub struct RaytracingSettings
 
 pub struct Renderer
 {
-    //accumulator: Vec<Float4>,
+    accumulator: Vec<Float3>,
     pub random_seeds: Vec<u32>,
     pub render_target: Surface,
     pub render_mode: RenderMode,
     pub ray_tracing_settings: RaytracingSettings,
     seed: u32,
+    accumulated_pixels: u32,
+    prev_render_mode: RenderMode,
+    prev_lighting_mode: LightingMode
 }
 
 
@@ -49,7 +52,7 @@ impl Renderer
         let mut seed = init_seed(seed_base);
 
         Renderer{
-            //accumulator: vec![Float4::zero(); SCRWIDTH * SCRHEIGHT],
+            accumulator: vec![Float3::zero(); SCRWIDTH * SCRHEIGHT],
             random_seeds: vec![0; SCRWIDTH * SCRHEIGHT],
             render_target: Surface::new(),
             render_mode: RenderMode::Standard,
@@ -58,7 +61,10 @@ impl Renderer
                 lighting_mode: LightingMode::None,
                 area_sample_size: 1,
             },
-            seed
+            seed,
+            accumulated_pixels: 0,
+            prev_render_mode: RenderMode::Standard,
+            prev_lighting_mode: LightingMode::None
         }
     }
 
@@ -182,6 +188,13 @@ impl Renderer
 
     pub fn render(&mut self, scene: &Scene, camera: &Camera)
     {
+        if self.prev_render_mode != self.render_mode || self.ray_tracing_settings.lighting_mode != self.prev_lighting_mode
+        {
+            self.reset_accumulator();
+        }
+        self.prev_render_mode = self.render_mode;
+        self.prev_lighting_mode = self.ray_tracing_settings.lighting_mode;
+
         for i in 0..(SCRWIDTH * SCRHEIGHT)
         {
             self.random_seeds[i] = random_uint_s(&mut self.seed);
@@ -189,12 +202,19 @@ impl Renderer
 
         match self.render_mode {
             RenderMode::Standard => {
-                self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                self.accumulated_pixels += 1;
+
+                self.accumulator.par_iter_mut().enumerate().for_each(|(index, value)|
                 {
                     let mut seed = self.random_seeds[index];
                     let mut ray = camera.get_primary_ray_indexed(index);
-                    let ray_color = Renderer::trace(&mut ray, &scene, &self.ray_tracing_settings, &mut seed, 1);
-                    *value = rgbf32_to_rgb8_f3(&ray_color);
+                    *value += Renderer::trace(&mut ray, &scene, &self.ray_tracing_settings, &mut seed, 1);
+                });
+
+                self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                {
+                    let acc_color = self.accumulator[index] / (self.accumulated_pixels as f32);
+                    *value = rgbf32_to_rgb8_f3(&acc_color);
                 });
             },
             RenderMode::Normals => {
@@ -214,6 +234,8 @@ impl Renderer
                 });
             }
         }
+
+
     }
 
     fn get_color_from_material(ray: &Ray, scene: &Scene, intersection: &Float3, material: &Material) -> Float3
@@ -233,5 +255,13 @@ impl Renderer
             }
             SimpleMaterial::BlackMaterial => { return Float3::zero(); }
         }
+    }
+
+    pub fn reset_accumulator(&mut self)
+    {
+        self.accumulator.par_iter_mut().for_each(|value|{
+            *value = Float3::zero();
+        });
+        self.accumulated_pixels = 0;
     }
 }

@@ -50,7 +50,10 @@ impl Application
 
         self.internal_timer.print_frame_time();
 
-        self.camera.handle_input(&input, delta_time);
+        if self.camera.handle_input(&input, delta_time)
+        {
+            self.renderer.reset_accumulator();
+        }
     }
 
     pub fn ui(&mut self, ui: &mut Ui)

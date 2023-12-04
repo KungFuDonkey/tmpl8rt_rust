@@ -52,11 +52,11 @@ impl Camera
         return self.get_primary_ray(x as f32, y as f32);
     }
 
-    pub fn handle_input(&mut self, input: &Input, delta_time: f32)
+    pub fn handle_input(&mut self, input: &Input, delta_time: f32) -> bool
     {
         if !input.window_has_focus()
         {
-            return;
+            return false;
         }
 
         let speed = 2.5 * delta_time;
@@ -122,7 +122,7 @@ impl Camera
 
         if !changed
         {
-            return;
+            return false;
         }
 
         ahead = normalize( &(self.target - self.position) );
@@ -131,5 +131,7 @@ impl Camera
         self.top_left = self.position + ahead * 2.0 - right * self.aspect_ratio  + up;
         self.top_right = self.position + ahead * 2.0  + right * self.aspect_ratio + up;
         self.bottom_left = self.position + ahead * 2.0 - right * self.aspect_ratio - up;
+
+        return true;
     }
 }
