@@ -9,6 +9,8 @@ mod timer;
 mod input;
 mod renderer;
 mod material;
+mod ray;
+mod objects;
 
 use surface::*;
 use crate::opengl::{draw_quad, GLTexture, Shader, TextureType};

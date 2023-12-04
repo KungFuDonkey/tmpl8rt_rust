@@ -1,6 +1,6 @@
 use crate::input::Input;
 use crate::math::*;
-use crate::scene::Ray;
+use crate::ray::*;
 use crate::surface::{SCRHEIGHT, SCRWIDTH};
 
 pub struct Camera

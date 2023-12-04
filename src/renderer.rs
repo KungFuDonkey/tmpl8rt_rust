@@ -2,7 +2,8 @@ use crate::camera::Camera;
 use crate::math::*;
 use crate::surface::*;
 use crate::material::*;
-use crate::scene::{Ray, Scene};
+use crate::scene::Scene;
+use crate::ray::*;
 use rayon::prelude::*;
 
 #[derive(PartialEq, Copy, Clone, Debug)]
