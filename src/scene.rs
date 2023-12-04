@@ -34,11 +34,11 @@ impl Scene
 
         let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 2.5)) * Mat4::scale(0.5);
         let triangle_mesh = Mesh::triangle(0, 6, transform);
-        let triangle_bvh = BVH::from_mesh(&triangle_mesh);
+        let triangle_bvh = BVH::from_mesh(&triangle_mesh, 128);
 
         let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, -1.0)) * Mat4::scale(0.5);
         let unity_mesh = Mesh::from_tri_file(1, 8, transform, std::path::Path::new("./assets/unity.tri"));
-        let unity_bvh = BVH::from_mesh(&unity_mesh);
+        let unity_bvh = BVH::from_mesh(&unity_mesh, 128);
 
         Scene{
             spheres: vec![

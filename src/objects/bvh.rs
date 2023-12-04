@@ -163,15 +163,14 @@ pub struct BVH
     pub t: Mat4,
     pub inv_t: Mat4,
     pub normals: Vec<Float3>,
+    pub bin_size: usize,
     pub obj_idx: usize,
     pub mat_idx: usize
 }
 
-const BVH_BINS: usize = 128;
-
 impl BVH
 {
-    pub fn from_mesh(mesh: &Mesh) -> Self
+    pub fn from_mesh(mesh: &Mesh, bin_size: usize) -> Self
     {
         let prim_count = mesh.triangles.len();
         let mut triangles: Vec<BVHTriangle> = Vec::with_capacity(prim_count * 2);
@@ -268,7 +267,8 @@ impl BVH
             inv_t: mesh.inv_t,
             normals: mesh.triangle_normals.to_vec(),
             obj_idx: mesh.obj_idx,
-            mat_idx: mesh.mat_idx
+            mat_idx: mesh.mat_idx,
+            bin_size
         };
 
         bvh.subdivide(root_node_idx, prim_count);
@@ -368,8 +368,8 @@ impl BVH
                 continue;
             }
             // loop over split plane candidates
-            let bin_width = (bounds_max - bounds_min) / (BVH_BINS as f32);
-            for b in 1..BVH_BINS
+            let bin_width = (bounds_max - bounds_min) / (self.bin_size as f32);
+            for b in 1..self.bin_size
             {
                 let plane = bounds_min + bin_width * (b as f32);
 
@@ -421,8 +421,8 @@ impl BVH
             }
 
             // calculate cost of spatial splits
-            let bin_extend = (bounds_max - bounds_min) / (BVH_BINS as f32);
-            for b in 1..BVH_BINS
+            let bin_extend = (bounds_max - bounds_min) / (self.bin_size as f32);
+            for b in 1..self.bin_size
             {
                 // calculate spatial split plane position
                 let pos = bounds_min + (b as f32) * bin_extend;
