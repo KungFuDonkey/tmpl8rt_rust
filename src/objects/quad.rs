@@ -6,13 +6,13 @@ pub struct Quad
     pub size: f32,
     pub t: Mat4,
     pub inv_t: Mat4,
-    pub obj_idx: i32,
-    pub mat_idx: i32,
+    pub obj_idx: usize,
+    pub mat_idx: usize,
 }
 
 impl Quad
 {
-    pub fn new(obj_idx: i32, mat_idx: i32, size: f32, transform: &Mat4) -> Quad
+    pub fn new(obj_idx: usize, mat_idx: usize, size: f32, transform: &Mat4) -> Quad
     {
         Quad{
             obj_idx,

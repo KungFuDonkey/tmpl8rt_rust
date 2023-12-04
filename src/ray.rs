@@ -20,7 +20,7 @@ pub struct Ray {
     pub direction: Float3,
     pub r_direction: Float3,
     pub t: f32,
-    pub obj_idx: i32,
+    pub obj_idx: usize,
     pub sub_obj_idx: usize,
     pub obj_type: RayHittableObjectType,
     pub inside: bool
@@ -36,7 +36,7 @@ impl Ray {
             direction: Float3::zero(),
             r_direction: Float3::zero(),
             t: 1.0e34,
-            obj_idx: -1,
+            obj_idx: usize::MAX,
             sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
             inside: false
@@ -50,7 +50,7 @@ impl Ray {
             direction: Float3::from_xyz(direction.x, direction.y, direction.z),
             r_direction: Float3::from_xyz(1.0 / direction.x, 1.0 / direction.y, 1.0 / direction.z),
             t: 1.0e34,
-            obj_idx: -1,
+            obj_idx: usize::MAX,
             sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
             inside: false
@@ -65,7 +65,7 @@ impl Ray {
             direction: Float3::from_xyz(direction.x, direction.y, direction.z),
             r_direction: Float3::from_xyz(1.0 / direction.x, 1.0 / direction.y, 1.0 / direction.z),
             t: distance,
-            obj_idx: -1,
+            obj_idx: usize::MAX,
             sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
             inside: false

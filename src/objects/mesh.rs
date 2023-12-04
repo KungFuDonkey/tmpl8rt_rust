@@ -6,15 +6,15 @@ pub struct Mesh
     pub vertices: Vec<Float3>,
     pub triangles: Vec<[usize; 3]>,
     pub triangle_normals: Vec<Float3>,
-    pub obj_idx: i32,
-    pub mat_idx: i32,
+    pub obj_idx: usize,
+    pub mat_idx: usize,
     pub t: Mat4,
     pub inv_t: Mat4
 }
 
 impl Mesh
 {
-    pub fn from_tri_file(obj_idx: i32, mat_idx: i32, transform: Mat4, path: &std::path::Path) -> Self
+    pub fn from_tri_file(obj_idx: usize, mat_idx: usize, transform: Mat4, path: &std::path::Path) -> Self
     {
         let mut vertices = Vec::new();
         let mut triangles = Vec::new();
@@ -54,7 +54,7 @@ impl Mesh
         }
     }
 
-    pub fn triangle(obj_idx: i32, mat_idx: i32, transform: Mat4) -> Self
+    pub fn triangle(obj_idx: usize, mat_idx: usize, transform: Mat4) -> Self
     {
         let vertices = vec![Float3::from_xyz(0.0, 0.0, 0.0), Float3::from_xyz(1.0, 0.0, 0.0), Float3::from_xyz(0.0, 1.0, 0.3)];
         let triangles = vec![[0,2,1]];

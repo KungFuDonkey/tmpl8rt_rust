@@ -7,8 +7,8 @@ pub struct Sphere
     pub radius: f32,
     pub radius2: f32,
     pub inv_radius: f32,
-    pub obj_idx: i32,
-    pub mat_idx: i32,
+    pub obj_idx: usize,
+    pub mat_idx: usize,
 }
 
 impl RayHittableObject for Sphere
@@ -76,7 +76,7 @@ impl RayHittableObject for Sphere
 
 impl Sphere
 {
-    pub fn new(obj_idx: i32, mat_idx: i32, position: Float3, radius: f32) -> Self
+    pub fn new(obj_idx: usize, mat_idx: usize, position: Float3, radius: f32) -> Self
     {
         Sphere
         {

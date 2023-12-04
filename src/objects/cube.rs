@@ -3,8 +3,8 @@ use crate::ray::*;
 
 pub struct Cube
 {
-    pub obj_idx: i32,
-    pub mat_idx: i32,
+    pub obj_idx: usize,
+    pub mat_idx: usize,
     pub b: [Float3; 2],
     pub m: Mat4,
     pub inv_m: Mat4
@@ -127,7 +127,7 @@ impl RayHittableObject for Cube
 
 impl Cube
 {
-    pub fn new(obj_idx: i32, mat_idx: i32, pos: Float3, size: Float3) -> Self
+    pub fn new(obj_idx: usize, mat_idx: usize, pos: Float3, size: Float3) -> Self
     {
         Cube{
             obj_idx,

@@ -49,8 +49,8 @@ impl PlaneUVFunction
 
 pub struct Plane
 {
-    pub obj_idx: i32,
-    pub mat_idx: i32,
+    pub obj_idx: usize,
+    pub mat_idx: usize,
     pub normal: Float3,
     pub distance: f32,
     pub uv_function: PlaneUVFunction
@@ -84,7 +84,7 @@ impl RayHittableObject for Plane
 
 impl Plane
 {
-    pub fn new(obj_idx: i32, mat_idx: i32, normal: Float3, distance: f32, uv_function: PlaneUVFunction) -> Self
+    pub fn new(obj_idx: usize, mat_idx: usize, normal: Float3, distance: f32, uv_function: PlaneUVFunction) -> Self
     {
         Plane{
             obj_idx,

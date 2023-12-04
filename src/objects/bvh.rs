@@ -1,3 +1,4 @@
+use std::usize;
 use crate::math::*;
 use crate::ray::*;
 use crate::objects::mesh::*;
@@ -164,8 +165,8 @@ pub struct BVH
     pub t: Mat4,
     pub inv_t: Mat4,
     pub normals: Vec<Float3>,
-    pub obj_idx: i32,
-    pub mat_idx: i32
+    pub obj_idx: usize,
+    pub mat_idx: usize
 }
 
 const BVH_BINS: usize = 128;
@@ -821,8 +822,8 @@ impl RayHittableObject for BVH
     fn is_occluded(&self, ray: &Ray) -> bool {
         let mut shadow = ray.clone();
         shadow.t = 1e34;
-        shadow.obj_idx = i32::MAX;
+        shadow.obj_idx = usize::MAX;
         self.intersect(&mut shadow);
-        return shadow.obj_idx == i32::MAX;
+        return shadow.obj_idx == usize::MAX;
     }
 }

@@ -65,7 +65,7 @@ impl Renderer
     fn render_normals(ray: &mut Ray, scene: &Scene) -> Float3
     {
         scene.intersect_scene(ray);
-        if ray.obj_idx == -1
+        if ray.obj_idx == usize::MAX
         {
             return Float3::zero();
         }
@@ -78,7 +78,7 @@ impl Renderer
     fn render_distances(ray: &mut Ray, scene: &Scene) -> Float3
     {
         scene.intersect_scene(ray);
-        if ray.obj_idx == -1
+        if ray.obj_idx == usize::MAX
         {
             return Float3::zero();
         }
@@ -98,7 +98,7 @@ impl Renderer
     fn trace(ray: &mut Ray, scene: &Scene, render_settings: &RaytracingSettings, seed: &mut u32, bounces: i32) -> Float3
     {
         scene.intersect_scene(ray);
-        if ray.obj_idx == -1
+        if ray.obj_idx == usize::MAX
         {
             return Float3::zero();
         }

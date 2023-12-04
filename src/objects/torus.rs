@@ -6,15 +6,15 @@ pub struct Torus
     pub rt2: f32,
     pub rc2: f32,
     pub r2: f32,
-    pub obj_idx: i32,
-    pub mat_idx: i32,
+    pub obj_idx: usize,
+    pub mat_idx: usize,
     pub t: Mat4,
     pub inv_t: Mat4
 }
 
 impl Torus
 {
-    pub fn new(obj_idx: i32, mat_idx: i32, a: f32, b: f32) -> Self
+    pub fn new(obj_idx: usize, mat_idx: usize, a: f32, b: f32) -> Self
     {
         Torus
         {

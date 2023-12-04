@@ -247,7 +247,7 @@ impl Scene
     pub fn get_normal(&self, ray: &Ray, i: &Float3, wo: &Float3) -> Float3
     {
         let obj_idx = ray.obj_idx;
-        if obj_idx == -1
+        if obj_idx == usize::MAX
         {
             println!("ERROR: obj_idx not set or no object was hit");
             return Float3::zero();
@@ -308,7 +308,7 @@ impl Scene
         {
             RayHittableObjectType::None =>
             {
-                -1
+                usize::MAX
             },
             RayHittableObjectType::Sphere =>
             {
