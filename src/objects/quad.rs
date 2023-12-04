@@ -23,6 +23,17 @@ impl Quad
         }
     }
 
+    pub fn random_point(&self, seed: &mut u32) -> Float3
+    {
+        let size = self.size;
+        let corner1 = transform_position(&Float3::from_xyz(-size, 0.0, -size), &self.t);
+        let corner2 = transform_position(&Float3::from_xyz(size, 0.0, -size), &self.t);
+        let corner3 = transform_position(&Float3::from_xyz(-size, 0.0, size), &self.t);
+        let r1 = random_float_s(seed);
+        let r2 = random_float_s(seed);
+        return corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1);
+    }
+
     pub fn random_points(&self, num: usize, seed: &mut u32) -> Vec<Float3>
     {
         let mut vector: Vec<Float3> = Vec::with_capacity(num);

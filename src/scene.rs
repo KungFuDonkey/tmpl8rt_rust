@@ -172,6 +172,14 @@ impl Scene
             }
         }
 
+        for bvh in &self.bvhs
+        {
+            if bvh.is_occluded(ray)
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -187,30 +195,30 @@ impl Scene
         }
     }
 
-    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, area_sample_size: usize, seed: &mut u32) -> Float3
+    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, sample_size: usize, seed: &mut u32) -> Float3
     {
-        let total_sample_points = self.quads.len() * area_sample_size;
+        let total_sample_points = sample_size;
         let sample_strength = 1.0 / (total_sample_points as f32);
         let mut lighting = Float3::zero();
-        for quad in &self.quads
+
+        for i in 0..sample_size
         {
-            let light_points = quad.random_points(area_sample_size, seed);
-            for light_point in light_points
+            let quad_index = random_uint_s(seed) % (self.quads.len() as u32);
+            let quad = &self.quads[quad_index as usize];
+            let light_point = quad.random_point(seed);
+            let ray_dir = light_point - *point;
+            let ray_dir_n = normalize(&ray_dir);
+            let origin = (*point) + (EPSILON * ray_dir_n);
+            let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
+
+            if self.is_occluded(&ray)
             {
-                let ray_dir = light_point - *point;
-                let ray_dir_n = normalize(&ray_dir);
-                let origin = (*point) + (EPSILON * ray_dir_n);
-                let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
-
-                if self.is_occluded(&ray)
-                {
-                    continue;
-                }
-
-                let light_color = self.get_quad_light_color(&quad, &light_point);
-                // take distance to the light?
-                lighting += sample_strength * dot(&ray_dir_n, &normal) * light_color;
+                continue;
             }
+
+            let light_color = self.get_quad_light_color(&quad, &light_point);
+            // take distance to the light?
+            lighting += sample_strength * dot(&ray_dir_n, &normal) * light_color;
         }
 
         return lighting;

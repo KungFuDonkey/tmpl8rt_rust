@@ -1,17 +1,15 @@
-use std::usize;
 use crate::math::*;
 use crate::ray::*;
 use crate::objects::mesh::*;
+use crate::objects::aabb::*;
+use crate::objects::triangle::*;
 
 #[derive(Clone, Copy)]
-pub struct Triangle
+struct BVHTriangle
 {
-    pub bounds: AABB,     // 24 bytes
-    pub tri_idx: i32,     //  4 bytes
-    pub vertex0: Float3,  // 12 bytes
-    pub vertex1: Float3,  // 12 bytes
-    pub vertex2: Float3   // 12 bytes
-}                         // 64 bytes
+    pub bounds: AABB,               // 24 bytes
+    pub internal_triangle: Triangle // 40 bytes
+}                                   // 64 bytes
 
 #[derive(Clone, Copy)]
 pub struct BVHNode
@@ -38,12 +36,12 @@ pub struct Clipped
 
 impl Clipped
 {
-    pub fn new(triangle: &Triangle, bounding_box: &AABB) -> Self
+    pub fn new(triangle: &BVHTriangle, bounding_box: &AABB) -> Self
     {
         let mut v = [Float3::zero(); 9];
-        v[0] = triangle.vertex0;
-        v[1] = triangle.vertex1;
-        v[2] = triangle.vertex2;
+        v[0] = triangle.internal_triangle.vertex0;
+        v[1] = triangle.internal_triangle.vertex1;
+        v[2] = triangle.internal_triangle.vertex2;
         let mut vertices: usize = 3;
 
         for a in 0..3
@@ -154,7 +152,7 @@ impl Clipped
 
 pub struct BVH
 {
-    pub triangles: Vec<Triangle>,
+    pub triangles: Vec<BVHTriangle>,
     pub bvh_nodes: Vec<BVHNode>,
     pub triangle_idx: Vec<usize>,
     pub triangle_tmp: Vec<usize>,
@@ -176,7 +174,7 @@ impl BVH
     pub fn from_mesh(mesh: &Mesh) -> Self
     {
         let prim_count = mesh.triangles.len();
-        let mut triangles: Vec<Triangle> = Vec::with_capacity(prim_count * 2);
+        let mut triangles: Vec<BVHTriangle> = Vec::with_capacity(prim_count * 2);
         let mut triangle_idx: Vec<usize> = Vec::with_capacity(prim_count * 2);
         let mut triangle_tmp: Vec<usize> = Vec::with_capacity(prim_count * 2);
 
@@ -187,13 +185,15 @@ impl BVH
             let vertex1 = mesh.vertices[triangle[1]];
             let vertex2 = mesh.vertices[triangle[2]];
 
-            triangles.push(Triangle
+            triangles.push(BVHTriangle
             {
                 bounds: AABB::from_empty(),
-                vertex0,
-                vertex1,
-                vertex2,
-                tri_idx,
+                internal_triangle: Triangle{
+                    vertex0,
+                    vertex1,
+                    vertex2,
+                    tri_idx,
+                },
             });
             triangle_idx.push(tri_idx as usize);
             triangle_tmp.push(0);
@@ -205,9 +205,9 @@ impl BVH
 
         triangles.iter_mut().for_each(|triangle|
             {
-                triangle.bounds = AABB::from_bounds(&triangle.vertex0, &triangle.vertex0);
-                triangle.bounds.grow(&triangle.vertex1);
-                triangle.bounds.grow(&triangle.vertex2);
+                triangle.bounds = AABB::from_bounds(&triangle.internal_triangle.vertex0, &triangle.internal_triangle.vertex0);
+                triangle.bounds.grow(&triangle.internal_triangle.vertex1);
+                triangle.bounds.grow(&triangle.internal_triangle.vertex2);
             });
 
         let mut root = BVHNode {
@@ -240,13 +240,15 @@ impl BVH
 
         for _ in &mesh.triangles
         {
-            triangles.push(Triangle
+            triangles.push(BVHTriangle
             {
                 bounds: AABB::from_empty(),
-                vertex0: Float3::zero(),
-                vertex1: Float3::zero(),
-                vertex2: Float3::zero(),
-                tri_idx: 0,
+                internal_triangle: Triangle{
+                    vertex0: Float3::zero(),
+                    vertex1: Float3::zero(),
+                    vertex2: Float3::zero(),
+                    tri_idx: 0,
+                }
             });
             triangle_idx.push(0);
             triangle_tmp.push(0);
@@ -330,62 +332,6 @@ impl BVH
         return cost;
     }
 
-
-    fn intersect_triangle(&self, ray: &mut Ray, tri_idx: usize) -> bool
-    {
-        let triangle = &self.triangles[tri_idx];
-        let edge1 = triangle.vertex1 - triangle.vertex0;
-        let edge2 = triangle.vertex2 - triangle.vertex0;
-        let h = cross(&ray.direction, &edge2);
-        let a = dot(&edge1, &h);
-        if a  > -0.0001 && a < 0.0001
-        {
-            return false;
-        }
-        let s = ray.origin - triangle.vertex0;
-        let f = 1.0 / a;
-        let u = f * dot(&s, &h);
-        if u < 0.0 || u > 1.0
-        {
-            return false;
-        }
-        let q = cross(&s, &edge1);
-        let v = f * dot(&ray.direction, &q);
-        if v < 0.0 || u + v > 1.0
-        {
-            return false;
-        }
-        let t = f * dot(&edge2, &q);
-        if t > 0.0001 && t < ray.t
-        {
-            ray.t = t;
-            ray.sub_obj_idx = triangle.tri_idx as usize;
-            return true;
-        }
-        return false;
-    }
-
-    fn intersect_aabb(&self, ray: &Ray, aabb: &AABB) -> f32
-    {
-        let tx1 = (aabb.min_bound.x - ray.origin.x) * ray.r_direction.x;
-        let tx2 = (aabb.max_bound.x - ray.origin.x) * ray.r_direction.x;
-        let mut tmin = tx1.min(tx2);
-        let mut tmax = tx1.max(tx2);
-        let ty1 = (aabb.min_bound.y - ray.origin.y) * ray.r_direction.y;
-        let ty2 = (aabb.max_bound.y - ray.origin.y) * ray.r_direction.y;
-        tmin = tmin.max(ty1.min(ty2));
-        tmax = tmax.min(ty1.max(ty2));
-        let tz1 = (aabb.min_bound.z - ray.origin.z) * ray.r_direction.z;
-        let tz2 = (aabb.max_bound.z - ray.origin.z) * ray.r_direction.z;
-        tmin = tmin.max(tz1.min(tz2));
-        tmax = tmax.min(tz1.max(tz2));
-        if tmax >= tmin && tmin < ray.t && tmax > 0.0
-        {
-            return tmin;
-        }
-        return 1e30;
-    }
-
     fn finalize_sbvh(&mut self, node_idx: usize)
     {
         let node = self.bvh_nodes[node_idx];
@@ -394,7 +340,7 @@ impl BVH
             for i in 0..node.tri_count
             {
                 let idx = self.triangle_idx[node.left_first + i];
-                self.triangle_idx[node.left_first + i] = self.triangles[idx].tri_idx as usize;
+                self.triangle_idx[node.left_first + i] = self.triangles[idx].internal_triangle.tri_idx as usize;
             }
             return;
         }
@@ -741,6 +687,7 @@ impl RayHittableObject for BVH
 
         let mut ray_t = Ray::directed_distance(O, D, ray.t);
         ray_t.obj_idx = ray.obj_idx;
+        ray_t.obj_type = ray.obj_type;
 
         let mut node = &self.bvh_nodes[self.root_node_idx];
         let mut stack = [BVHNode{
@@ -749,6 +696,8 @@ impl RayHittableObject for BVH
             left_first: 0
         }; 64];
 
+        let mut intersected = false;
+
         let mut stack_ptr: usize = 0;
         loop
         {
@@ -756,11 +705,7 @@ impl RayHittableObject for BVH
             {
                 for i in 0..node.tri_count
                 {
-                    if self.intersect_triangle(&mut ray_t, self.triangle_idx[node.left_first + i])
-                    {
-                        ray.obj_idx = self.obj_idx;
-                        ray.obj_type = RayHittableObjectType::Bvh;
-                    }
+                    intersected = intersected || intersect_triangle(&self.triangles[self.triangle_idx[node.left_first + i]].internal_triangle, &mut ray_t)
                 }
 
                 if stack_ptr == 0
@@ -776,8 +721,8 @@ impl RayHittableObject for BVH
             }
             let mut child1 = &self.bvh_nodes[node.left_first];
             let mut child2 = &self.bvh_nodes[node.left_first + 1];
-            let mut dist1 = self.intersect_aabb( &ray_t, &child1.bounds );
-            let mut dist2 = self.intersect_aabb( &ray_t, &child2.bounds );
+            let mut dist1 = intersect_aabb( &ray_t, &child1.bounds );
+            let mut dist2 = intersect_aabb( &ray_t, &child2.bounds );
             if dist1 > dist2
             {
                 let tmp = dist1;
@@ -808,7 +753,12 @@ impl RayHittableObject for BVH
             }
         }
         ray.t = ray_t.t;
-        ray.sub_obj_idx = ray_t.sub_obj_idx;
+        if intersected
+        {
+            ray.obj_idx = self.obj_idx;
+            ray.obj_type = RayHittableObjectType::Bvh;
+            ray.sub_obj_idx = ray_t.sub_obj_idx;
+        }
     }
 
     fn get_normal(&self, ray: &Ray, i: &Float3) -> Float3 {
@@ -824,6 +774,6 @@ impl RayHittableObject for BVH
         shadow.t = 1e34;
         shadow.obj_idx = usize::MAX;
         self.intersect(&mut shadow);
-        return shadow.obj_idx == usize::MAX;
+        return shadow.obj_idx != usize::MAX;
     }
 }
