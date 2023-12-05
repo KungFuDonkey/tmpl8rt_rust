@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 use crate::math::*;
 use crate::material::*;
+use crate::obj_loader::load_obj;
 use crate::ray::*;
 use crate::objects::sphere::*;
 use crate::objects::plane::*;
@@ -38,6 +39,21 @@ impl Scene
 {
     pub fn new() -> Self
     {
+        let materials = vec![
+            linear_color(Float3::from_a(1.0)),
+            linear_color(Float3::from_a(0.93)),
+            checkerboard_material(),
+            logo_material(),
+            red_material(),
+            blue_material(),
+            linear_color(Float3::from_xyz(1.0, 0.0, 0.0)),
+            linear_color(Float3::from_xyz(0.0, 1.0, 0.0)),
+            linear_color(Float3::from_xyz(0.0, 0.0, 1.0)),
+            reflective_material(linear_color_simple(Float3::from_a(1.0)), 0.02),
+            fully_reflective_material(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0))),
+            refractive_material_with_exit(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0)), 1.5, 10.0),
+        ];
+
         let mut torus = Torus::new(0, 0, 0.8, 0.25);
         let translation = Float3::from_xyz(-0.25, 0.0, 2.0);
         torus.t = Mat4::translate(&translation) * Mat4::rotate_x(PI / 4.0);
@@ -50,6 +66,14 @@ impl Scene
 
         let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 1.0)) * Mat4::scale(0.5);
         meshes.push(Mesh::from_tri_file(1, 8, transform, std::path::Path::new("./assets/unity.tri")));
+
+        let transform = Mat4::translate( &Float3::from_xyz(1.0, 0.0, 1.0)) * Mat4::scale(0.5);
+        let (msh, mts) = load_obj(&std::path::Path::new("./assets/suzanne.obj"), meshes.len(), materials.len(), &transform);
+
+        for mesh in msh
+        {
+            meshes.push(mesh);
+        }
 
         let mut bvhs: Vec<BVH> = Vec::new();
         let mut grids: Vec<Grid> = Vec::new();
@@ -87,20 +111,7 @@ impl Scene
             meshes,
             bvhs,
             grids,
-            materials: vec![
-                linear_color(Float3::from_a(1.0)),
-                linear_color(Float3::from_a(0.93)),
-                checkerboard_material(),
-                logo_material(),
-                red_material(),
-                blue_material(),
-                linear_color(Float3::from_xyz(1.0, 0.0, 0.0)),
-                linear_color(Float3::from_xyz(0.0, 1.0, 0.0)),
-                linear_color(Float3::from_xyz(0.0, 0.0, 1.0)),
-                reflective_material(linear_color_simple(Float3::from_a(1.0)), 0.02),
-                fully_reflective_material(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0))),
-                refractive_material_with_exit(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0)), 1.5, 10.0),
-            ],
+            materials,
             animation_time: 0.0
         }
     }

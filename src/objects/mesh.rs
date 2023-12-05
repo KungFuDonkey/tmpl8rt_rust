@@ -74,6 +74,22 @@ impl Mesh
         }
     }
 
+    pub fn from_data(obj_idx: usize, mat_idx: usize, transform: Mat4, vertices: Vec<Float3>, triangles: Vec<[usize; 3]>) -> Self
+    {
+        let triangle_normals = Mesh::compute_normals(&triangles, &vertices, &transform);
+
+        Mesh
+        {
+            vertices,
+            triangles,
+            triangle_normals,
+            obj_idx,
+            mat_idx,
+            t: transform,
+            inv_t: transform.inverted()
+        }
+    }
+
     fn compute_normals(triangles: &Vec<[usize; 3]>, vertices: &Vec<Float3>, transform: &Mat4) -> Vec<Float3>
     {
         let mut triangle_normals: Vec<Float3> = Vec::with_capacity(triangles.len());

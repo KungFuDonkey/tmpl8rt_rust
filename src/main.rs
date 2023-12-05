@@ -11,6 +11,7 @@ mod renderer;
 mod material;
 mod ray;
 mod objects;
+mod obj_loader;
 
 use surface::*;
 use crate::opengl::{draw_quad, GLTexture, Shader, TextureType};
