@@ -1,6 +1,6 @@
 use std::ops::{Deref};
 use crate::camera::Camera;
-use crate::scene::{Scene};
+use crate::scene::{MeshIntersectionSetting, Scene};
 use crate::timer::{FrameTimer};
 use imgui_glfw_rs::imgui::Ui;
 use imgui_glfw_rs::imgui::ImString;
@@ -65,16 +65,19 @@ impl Application
         ui.radio_button(ImString::new("Distance").deref(), &mut self.renderer.render_mode, RenderMode::Distance);
 
         ui.text(ImString::new("Raytracing Settings:").deref());
-        ui.slider_int(ImString::new("Bounces").deref(), &mut self.renderer.ray_tracing_settings.max_bounces, 0, 8 ).build();
+        ui.slider_int(ImString::new("Bounces").deref(), &mut self.renderer.render_settings.max_bounces, 0, 8 ).build();
 
         ui.text(ImString::new("Shadows:").deref());
-        ui.radio_button(ImString::new("No shadows").deref(), &mut self.renderer.ray_tracing_settings.lighting_mode, LightingMode::None);
-        ui.radio_button(ImString::new("Ray tracing + Hard Shadows").deref(), &mut self.renderer.ray_tracing_settings.lighting_mode, LightingMode::HardShadows);
-        ui.radio_button(ImString::new("Ray tracing + Soft Shadows").deref(), &mut self.renderer.ray_tracing_settings.lighting_mode, LightingMode::SoftShadows);
+        ui.radio_button(ImString::new("No shadows").deref(), &mut self.renderer.render_settings.lighting_mode, LightingMode::None);
+        ui.radio_button(ImString::new("Ray tracing + Hard Shadows").deref(), &mut self.renderer.render_settings.lighting_mode, LightingMode::HardShadows);
+        ui.radio_button(ImString::new("Ray tracing + Soft Shadows").deref(), &mut self.renderer.render_settings.lighting_mode, LightingMode::SoftShadows);
 
+        ui.slider_int(ImString::new("Light sample size").deref(), &mut self.renderer.render_settings.area_sample_size, 1, 8 ).build();
 
-        ui.slider_int(ImString::new("Light sample size").deref(), &mut self.renderer.ray_tracing_settings.area_sample_size, 1, 8 ).build();
-
+        ui.text(ImString::new("Acceleration structure:").deref());
+        ui.radio_button(ImString::new("None (not recommended)").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Raw);
+        ui.radio_button(ImString::new("Grid").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Grid);
+        ui.radio_button(ImString::new("BVH").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Bvh);
 
     }
 

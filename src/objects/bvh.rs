@@ -27,7 +27,7 @@ impl BVHNode
     }
 }
 
-pub struct Clipped
+struct Clipped
 {
     pub vertices: u32,
     pub v: [Float3; 9],
@@ -203,11 +203,11 @@ impl BVH
         let mut bvh_nodes: Vec<BVHNode> = Vec::with_capacity(prim_count * 4);
 
         triangles.iter_mut().for_each(|triangle|
-            {
-                triangle.bounds = AABB::from_bounds(&triangle.internal_triangle.vertex0, &triangle.internal_triangle.vertex0);
-                triangle.bounds.grow(&triangle.internal_triangle.vertex1);
-                triangle.bounds.grow(&triangle.internal_triangle.vertex2);
-            });
+        {
+            triangle.bounds = AABB::from_bounds(&triangle.internal_triangle.vertex0, &triangle.internal_triangle.vertex0);
+            triangle.bounds.grow(&triangle.internal_triangle.vertex1);
+            triangle.bounds.grow(&triangle.internal_triangle.vertex2);
+        });
 
         let mut root = BVHNode {
             left_first: 0,
@@ -682,10 +682,10 @@ impl BVH
 impl RayHittableObject for BVH
 {
     fn intersect(&self, ray: &mut Ray) {
-        let O = transform_position( &ray.origin, &self.inv_t );
-        let D = transform_vector( &ray.direction, &self.inv_t );
+        let origin = transform_position(&ray.origin, &self.inv_t );
+        let direction = transform_vector(&ray.direction, &self.inv_t );
 
-        let mut ray_t = Ray::directed_distance(O, D, ray.t);
+        let mut ray_t = Ray::directed_distance(origin, direction, ray.t);
         ray_t.obj_idx = ray.obj_idx;
         ray_t.obj_type = ray.obj_type;
 

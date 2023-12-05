@@ -1,4 +1,5 @@
 use crate::math::*;
+use crate::objects::triangle::Triangle;
 use crate::ray::*;
 
 
@@ -156,4 +157,97 @@ pub fn intersect_aabb(ray: &Ray, aabb: &AABB) -> f32
         return tmin;
     }
     return 1e30;
+}
+
+fn test_plane_intersection(normal_axis: f32, e0x: f32, e0y: f32, e1x: f32, e1y: f32, e2x: f32, e2y: f32, v0x: f32, v0y: f32, v1x: f32, v1y: f32, v2x: f32, v2y: f32, dpx: f32, dpy: f32, px: f32, py: f32) -> bool
+{
+    let mut m = 1.0;
+    if normal_axis < 0.0
+    {
+        m = -1.0;
+    }
+
+    let ne0 = Float3::from_xyz(-e0y, e0x, 0.0) * m;
+    let ne1 = Float3::from_xyz(-e1y, e1x, 0.0) * m;
+    let ne2 = Float3::from_xyz(-e2y, e2x, 0.0) * m;
+
+    let v0 = Float3::from_xyz(v0x, v0y, 0.0);
+    let v1 = Float3::from_xyz(v1x, v1y, 0.0);
+    let v2 = Float3::from_xyz(v2x, v2y, 0.0);
+
+    let zero: f32 = 0.0;
+    let de0 = -dot(&ne0, &v0) + zero.max(dpx * ne0.x) + zero.max(dpy * ne0.y);
+    let de1 = -dot(&ne1, &v1) + zero.max(dpx * ne1.x) + zero.max(dpy * ne1.y);
+    let de2 = -dot(&ne2, &v2) + zero.max(dpx * ne2.x) + zero.max(dpy * ne2.y);
+
+    let pp = Float3::from_xyz(px, py, 0.0);
+    if (dot(&ne0, &pp) + de0) < 0.0 ||
+        (dot(&ne1, &pp) + de1) < 0.0 ||
+        (dot(&ne1, &pp) + de2) < 0.0
+    {
+        return false;
+    }
+
+    return true;
+}
+
+pub fn intersect_aabb_triangle(aabb: &AABB, triangle: &Triangle, triangle_normal: &Float3) -> bool
+{
+    let n = triangle_normal;
+    let p = aabb.min_bound;
+    let dp = aabb.max_bound - p;
+
+    let mut c = Float3::zero();
+    if n.x > 0.0
+    {
+        c.x = dp.x;
+    }
+    if n.y > 0.0
+    {
+        c.y = dp.y;
+    }
+    if n.z > 0.0
+    {
+        c.z = dp.z;
+    }
+
+    let d1 = dot(n, &(c - triangle.vertex0));
+    let d2 = dot(n, &(dp - c - triangle.vertex0));
+
+    if (dot(n, &p) + d1) * (dot(n,&p) + d2) > 0.0
+    {
+        return false;
+    }
+
+    let edge0 = triangle.vertex1 - triangle.vertex0;
+    let edge1 = triangle.vertex2 - triangle.vertex0;
+    let edge2 = triangle.vertex2 - triangle.vertex1;
+
+    if !(test_plane_intersection(n.z, edge0.x, edge0.y, edge1.x, edge1.y, edge2.x, edge2.y,
+         triangle.vertex0.x, triangle.vertex0.y, triangle.vertex1.x, triangle.vertex1.y, triangle.vertex2.x, triangle.vertex2.y,
+         dp.x, dp.y, p.x, p.y))
+    {
+        return false;
+    }
+
+    if !(test_plane_intersection(n.x, edge0.y, edge0.z, edge1.y, edge1.z, edge2.y, edge2.z,
+                                 triangle.vertex0.y, triangle.vertex0.z, triangle.vertex1.y, triangle.vertex1.z, triangle.vertex2.y, triangle.vertex2.z,
+                                 dp.y, dp.z, p.y, p.z))
+    {
+        return false;
+    }
+
+    if !(test_plane_intersection(n.y, edge0.z, edge0.x, edge1.z, edge1.x, edge2.z, edge2.x,
+                                 triangle.vertex0.z, triangle.vertex0.x, triangle.vertex1.z, triangle.vertex1.x, triangle.vertex2.z, triangle.vertex2.x,
+                                 dp.z, dp.x, p.z, p.x))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+pub fn triangle_is_in_aabb(aabb: &AABB, triangle: &Triangle, triangle_normal: &Float3) -> bool
+{
+    aabb.contains(&triangle.vertex0) || aabb.contains(&triangle.vertex1) || aabb.contains(&triangle.vertex2) || intersect_aabb_triangle(aabb, triangle, triangle_normal)
 }

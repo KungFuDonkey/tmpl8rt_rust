@@ -9,6 +9,16 @@ use crate::objects::torus::*;
 use crate::objects::quad::*;
 use crate::objects::mesh::*;
 use crate::objects::bvh::*;
+use crate::objects::grid::*;
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum MeshIntersectionSetting
+{
+    Raw,
+    Bvh,
+    Grid
+}
+
 
 pub struct Scene
 {
@@ -19,6 +29,7 @@ pub struct Scene
     quads: Vec<Quad>,
     meshes: Vec<Mesh>,
     bvhs: Vec<BVH>,
+    grids: Vec<Grid>,
     materials: Vec<Material>,
     animation_time: f32,
 }
@@ -33,12 +44,20 @@ impl Scene
         torus.inv_t = torus.t.inverted();
 
         let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 2.5)) * Mat4::scale(0.5);
-        let triangle_mesh = Mesh::triangle(0, 6, transform);
-        let triangle_bvh = BVH::from_mesh(&triangle_mesh, 128);
 
-        let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, -1.0)) * Mat4::scale(0.5);
-        let unity_mesh = Mesh::from_tri_file(1, 8, transform, std::path::Path::new("./assets/unity.tri"));
-        let unity_bvh = BVH::from_mesh(&unity_mesh, 128);
+        let mut meshes: Vec<Mesh> = Vec::new();
+        meshes.push(Mesh::triangle(0, 6, transform));
+
+        let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 1.0)) * Mat4::scale(0.5);
+        meshes.push(Mesh::from_tri_file(1, 8, transform, std::path::Path::new("./assets/unity.tri")));
+
+        let mut bvhs: Vec<BVH> = Vec::new();
+        let mut grids: Vec<Grid> = Vec::new();
+        for mesh in &meshes
+        {
+            bvhs.push(BVH::from_mesh(mesh, 128));
+            grids.push(Grid::from_mesh(mesh, 64, 64, 64));
+        }
 
         Scene{
             spheres: vec![
@@ -57,7 +76,7 @@ impl Scene
                 Cube::new(0, 10, Float3::zero(), Float3::from_a(1.15))
             ],
             tori: vec![
-                torus
+                //torus
             ],
             quads: vec![
                 Quad::new(0, 6, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, -1.0))),
@@ -65,13 +84,9 @@ impl Scene
                 Quad::new(2, 8, 0.5, &Mat4::translate(&Float3::from_xyz(1.0, 1.5, 1.0))),
                 Quad::new(3, 0, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, 1.0))),
             ],
-            meshes: vec![
-                //triangle_mesh
-            ],
-            bvhs: vec![
-                triangle_bvh,
-                unity_bvh
-            ],
+            meshes,
+            bvhs,
+            grids,
             materials: vec![
                 linear_color(Float3::from_a(1.0)),
                 linear_color(Float3::from_a(0.93)),
@@ -90,7 +105,7 @@ impl Scene
         }
     }
 
-    pub fn intersect_scene(&self, ray: &mut Ray)
+    pub fn intersect_scene(&self, ray: &mut Ray, mesh_setting: &MeshIntersectionSetting)
     {
         for sphere in &self.spheres
         {
@@ -117,18 +132,32 @@ impl Scene
             quad.intersect(ray);
         }
 
-        for mesh in &self.meshes
-        {
-            mesh.intersect(ray);
-        }
-
-        for bvhs in &self.bvhs
-        {
-            bvhs.intersect(ray);
+        match mesh_setting {
+            MeshIntersectionSetting::Raw =>
+            {
+                for mesh in &self.meshes
+                {
+                    mesh.intersect(ray);
+                }
+            }
+            MeshIntersectionSetting::Bvh =>
+            {
+                for bvh in &self.bvhs
+                {
+                    bvh.intersect(ray);
+                }
+            }
+            MeshIntersectionSetting::Grid =>
+            {
+                for grid in &self.grids
+                {
+                    grid.intersect(ray);
+                }
+            }
         }
     }
 
-    pub fn is_occluded(&self, ray: &Ray) -> bool
+    pub fn is_occluded(&self, ray: &Ray, mesh_setting: &MeshIntersectionSetting) -> bool
     {
         for sphere in &self.spheres
         {
@@ -164,19 +193,33 @@ impl Scene
             }
         }
 
-        for mesh in &self.meshes
-        {
-            if mesh.is_occluded(ray)
-            {
-                return true;
+        match mesh_setting {
+            MeshIntersectionSetting::Raw => {
+                for mesh in &self.meshes
+                {
+                    if mesh.is_occluded(ray)
+                    {
+                        return true;
+                    }
+                }
             }
-        }
-
-        for bvh in &self.bvhs
-        {
-            if bvh.is_occluded(ray)
-            {
-                return true;
+            MeshIntersectionSetting::Bvh => {
+                for bvh in &self.bvhs
+                {
+                    if bvh.is_occluded(ray)
+                    {
+                        return true;
+                    }
+                }
+            }
+            MeshIntersectionSetting::Grid => {
+                for grid in &self.grids
+                {
+                    if grid.is_occluded(ray)
+                    {
+                        return true;
+                    }
+                }
             }
         }
 
@@ -195,7 +238,7 @@ impl Scene
         }
     }
 
-    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, sample_size: usize, seed: &mut u32) -> Float3
+    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, sample_size: usize, seed: &mut u32, mesh_setting: &MeshIntersectionSetting) -> Float3
     {
         let total_sample_points = sample_size;
         let sample_strength = 1.0 / (total_sample_points as f32);
@@ -211,7 +254,7 @@ impl Scene
             let origin = (*point) + (EPSILON * ray_dir_n);
             let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
 
-            if self.is_occluded(&ray)
+            if self.is_occluded(&ray, mesh_setting)
             {
                 continue;
             }
@@ -224,7 +267,7 @@ impl Scene
         return lighting;
     }
 
-    pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3) -> Float3
+    pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3, mesh_setting: &MeshIntersectionSetting) -> Float3
     {
         let total_sample_points = (self.quads.len() as u32);
         let light_strength = 1.0 / (total_sample_points as f32);
@@ -237,7 +280,7 @@ impl Scene
             let origin = (*point) + (EPSILON * ray_dir_n);
             let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
 
-            if self.is_occluded(&ray)
+            if self.is_occluded(&ray, mesh_setting)
             {
                 continue;
             }
@@ -299,6 +342,10 @@ impl Scene
             {
                 self.bvhs[obj_idx].get_normal(ray, i)
             }
+            RayHittableObjectType::Grid =>
+            {
+                self.grids[obj_idx].get_normal(ray, i)
+            }
         };
 
         if dot(&normal, &wo) > 0.0
@@ -345,6 +392,10 @@ impl Scene
             RayHittableObjectType::Bvh =>
             {
                 self.bvhs[obj_idx as usize].mat_idx
+            },
+            RayHittableObjectType::Grid =>
+            {
+                self.grids[obj_idx as usize].mat_idx
             }
         };
         &self.materials[mat_idx as usize]
@@ -388,6 +439,10 @@ impl Scene
             RayHittableObjectType::Bvh =>
             {
                 self.bvhs[obj_idx].get_uv(i)
+            },
+            RayHittableObjectType::Grid =>
+            {
+                self.grids[obj_idx].get_uv(i)
             }
         }
     }
@@ -430,6 +485,10 @@ impl Scene
             RayHittableObjectType::Bvh =>
             {
                 self.bvhs[obj_idx].intersect(ray)
+            },
+            RayHittableObjectType::Grid =>
+            {
+                self.grids[obj_idx].intersect(ray)
             }
         }
     }

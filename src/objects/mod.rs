@@ -5,6 +5,6 @@ pub mod quad;
 pub mod sphere;
 pub mod torus;
 pub mod mesh;
-mod grid;
+pub mod grid;
 mod triangle;
 mod aabb;

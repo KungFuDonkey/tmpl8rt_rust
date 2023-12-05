@@ -1,4 +1,5 @@
 use crate::math::*;
+use crate::objects::triangle::{intersect_triangle, Triangle};
 use crate::ray::*;
 
 pub struct Mesh

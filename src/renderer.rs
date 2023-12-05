@@ -2,7 +2,7 @@ use crate::camera::Camera;
 use crate::math::*;
 use crate::surface::*;
 use crate::material::*;
-use crate::scene::Scene;
+use crate::scene::{MeshIntersectionSetting, Scene};
 use crate::ray::*;
 use rayon::prelude::*;
 
@@ -22,11 +22,12 @@ pub enum LightingMode
     HardShadows
 }
 
-pub struct RaytracingSettings
+pub struct RenderSettings
 {
     pub max_bounces: i32,
     pub lighting_mode: LightingMode,
     pub area_sample_size: i32,
+    pub mesh_intersection_setting: MeshIntersectionSetting
 }
 
 
@@ -36,7 +37,7 @@ pub struct Renderer
     pub random_seeds: Vec<u32>,
     pub render_target: Surface,
     pub render_mode: RenderMode,
-    pub ray_tracing_settings: RaytracingSettings,
+    pub render_settings: RenderSettings,
     seed: u32,
     accumulated_pixels: u32,
     prev_render_mode: RenderMode,
@@ -55,22 +56,23 @@ impl Renderer
             accumulator: vec![Float3::zero(); SCRWIDTH * SCRHEIGHT],
             random_seeds: vec![0; SCRWIDTH * SCRHEIGHT],
             render_target: Surface::new(),
-            render_mode: RenderMode::Standard,
-            ray_tracing_settings: RaytracingSettings {
+            render_mode: RenderMode::Normals,
+            render_settings: RenderSettings {
                 max_bounces: 1,
                 lighting_mode: LightingMode::None,
                 area_sample_size: 1,
+                mesh_intersection_setting: MeshIntersectionSetting::Grid
             },
             seed,
             accumulated_pixels: 0,
-            prev_render_mode: RenderMode::Standard,
+            prev_render_mode: RenderMode::Normals,
             prev_lighting_mode: LightingMode::None
         }
     }
 
-    fn render_normals(ray: &mut Ray, scene: &Scene) -> Float3
+    fn render_normals(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings) -> Float3
     {
-        scene.intersect_scene(ray);
+        scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
         if ray.obj_idx == usize::MAX
         {
             return Float3::zero();
@@ -81,9 +83,9 @@ impl Renderer
         return (normal + 1.0) * 0.5;
     }
 
-    fn render_distances(ray: &mut Ray, scene: &Scene) -> Float3
+    fn render_distances(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings) -> Float3
     {
-        scene.intersect_scene(ray);
+        scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
         if ray.obj_idx == usize::MAX
         {
             return Float3::zero();
@@ -91,19 +93,19 @@ impl Renderer
         return Float3::from_xyz(ray.t, ray.t, ray.t) * 0.1;
     }
 
-    fn get_lighting_color(ray: &Ray, scene: &Scene, intersection: &Float3, material: &Material, render_settings: &RaytracingSettings, seed: &mut u32) -> Float3
+    fn get_lighting_color(ray: &Ray, scene: &Scene, intersection: &Float3, material: &Material, render_settings: &RenderSettings, seed: &mut u32) -> Float3
     {
         let lighting: Float3 = match render_settings.lighting_mode {
             LightingMode::None => Float3::from_a(1.0),
-            LightingMode::HardShadows => scene.direct_lighting_hard(&intersection, &scene.get_normal(ray, &intersection, &ray.direction)),
-            LightingMode::SoftShadows => scene.direct_lighting_soft(&intersection, &scene.get_normal(ray, &intersection, &ray.direction), render_settings.area_sample_size as usize, seed)
+            LightingMode::HardShadows => scene.direct_lighting_hard(&intersection, &scene.get_normal(ray, &intersection, &ray.direction), &render_settings.mesh_intersection_setting),
+            LightingMode::SoftShadows => scene.direct_lighting_soft(&intersection, &scene.get_normal(ray, &intersection, &ray.direction), render_settings.area_sample_size as usize, seed, &render_settings.mesh_intersection_setting)
         };
         return lighting * Self::get_color_from_material(ray, scene, &intersection, material);
     }
 
-    fn trace(ray: &mut Ray, scene: &Scene, render_settings: &RaytracingSettings, seed: &mut u32, bounces: i32) -> Float3
+    fn trace(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings, seed: &mut u32, bounces: i32) -> Float3
     {
-        scene.intersect_scene(ray);
+        scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
         if ray.obj_idx == usize::MAX
         {
             return Float3::zero();
@@ -188,12 +190,12 @@ impl Renderer
 
     pub fn render(&mut self, scene: &Scene, camera: &Camera)
     {
-        if self.prev_render_mode != self.render_mode || self.ray_tracing_settings.lighting_mode != self.prev_lighting_mode
+        if self.prev_render_mode != self.render_mode || self.render_settings.lighting_mode != self.prev_lighting_mode
         {
             self.reset_accumulator();
         }
         self.prev_render_mode = self.render_mode;
-        self.prev_lighting_mode = self.ray_tracing_settings.lighting_mode;
+        self.prev_lighting_mode = self.render_settings.lighting_mode;
 
         for i in 0..(SCRWIDTH * SCRHEIGHT)
         {
@@ -208,7 +210,7 @@ impl Renderer
                 {
                     let mut seed = self.random_seeds[index];
                     let mut ray = camera.get_primary_ray_indexed(index);
-                    *value += Renderer::trace(&mut ray, &scene, &self.ray_tracing_settings, &mut seed, 1);
+                    *value += Renderer::trace(&mut ray, &scene, &self.render_settings, &mut seed, 1);
                 });
 
                 self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
@@ -221,7 +223,7 @@ impl Renderer
                 self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
                 {
                     let mut ray = camera.get_primary_ray_indexed(index);
-                    let ray_color = Renderer::render_normals(&mut ray, &scene);
+                    let ray_color = Renderer::render_normals(&mut ray, &scene, &self.render_settings);
                     *value = rgbf32_to_rgb8_f3(&ray_color);
                 });
             },
@@ -229,7 +231,7 @@ impl Renderer
                 self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
                 {
                     let mut ray = camera.get_primary_ray_indexed(index);
-                    let ray_color = Renderer::render_distances(&mut ray, &scene);
+                    let ray_color = Renderer::render_distances(&mut ray, &scene, &self.render_settings);
                     *value = rgbf32_to_rgb8_f3(&ray_color);
                 });
             }
