@@ -100,8 +100,10 @@ impl Renderer
     {
         scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
 
-        let r = ((ray.intersection_tests as f32) / 1000.0).min(1.0);
-        let g = ((1000 - ray.intersection_tests) as f32).max(0.0) / 1000.0;
+        let intersection_tests = ray.intersection_tests as f32;
+
+        let r = (intersection_tests / 1000.0).min(1.0);
+        let g = (1000.0 - intersection_tests).max(0.0) / 1000.0;
 
         if r > g
         {

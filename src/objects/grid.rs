@@ -7,9 +7,8 @@ use crate::ray::*;
 #[derive(Clone, Copy)]
 struct GridTriangle
 {
-    pub bounds: AABB,               // 24 bytes
     pub internal_triangle: Triangle // 40 bytes
-}                                   // 64 bytes
+}
 
 
 pub struct Grid
@@ -26,130 +25,6 @@ pub struct Grid
     pub cell_size: Float3,
     pub obj_idx: usize,
     pub mat_idx: usize
-}
-
-
-struct Clipped
-{
-    pub vertices: u32,
-    pub v: [Float3; 9],
-    pub bounds: AABB
-}
-
-impl Clipped
-{
-    pub fn new(triangle: &GridTriangle, bounding_box: &AABB) -> Self
-    {
-        let mut v = [Float3::zero(); 9];
-        v[0] = triangle.internal_triangle.vertex0;
-        v[1] = triangle.internal_triangle.vertex1;
-        v[2] = triangle.internal_triangle.vertex2;
-        let mut vertices: usize = 3;
-
-        for a in 0..3
-        {
-            let mut ntmp = 0;
-            let mut tmp = [Float3::zero(); 9];
-            let mut C = Float3::zero();
-            let mut v0 = v[vertices - 1];
-            let mut v1 = Float3::zero();
-            let mut plane = bounding_box.minimal(a);
-            let mut x = (v0.get_axis(a) - plane) >= 0.0;
-            for i in 0..vertices
-            {
-                v1 = v[i];
-                let d0 = v0.get_axis(a) - plane;
-                let d1 = v1.get_axis(a) - plane;
-                if x && d1 >= 0.0
-                {
-                    /* both in */
-                    tmp[ntmp] = v1;
-                    ntmp += 1;
-                }
-                else if !x && d1 > 0.0
-                {
-                    // coming in: emit C and d1
-                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
-                    C.set_axis(a, plane);
-                    tmp[ntmp] = C;
-                    ntmp += 1;
-                    tmp[ntmp] = v1;
-                    ntmp += 1;
-                    x = true;
-                }
-                else if x && d1 < 0.0 // going out: emit C
-                {
-                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
-                    C.set_axis(a, plane);
-                    tmp[ntmp] = C;
-                    ntmp += 1;
-                    x = false;
-                }
-
-                v0 = v1;
-            }
-            vertices = 0;
-            if ntmp < 3
-            {
-                break;
-            }
-            v0 = tmp[ntmp - 1];
-            plane = bounding_box.maximal(a);
-            x = (plane - v0.get_axis(a)) >= 0.0;
-            for i in 0..ntmp
-            {
-                v1 = tmp[i];
-                let d0 = plane - v0.get_axis(a);
-                let d1 = plane - v1.get_axis(a);
-                if x && d1 >= 0.0
-                {
-                    /* both in */
-                    v[vertices] = v1;
-                    vertices += 1;
-                }
-                else if !x && d1 > 0.0
-                {
-                    // coming in: emit C and d1
-                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
-                    C.set_axis(a,plane);
-                    v[vertices] = C;
-                    vertices += 1;
-                    v[vertices] = v1;
-                    vertices += 1;
-                    x = true;
-                }
-                else if x && d1 < 0.0
-                {
-                    // going out: emit C
-                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
-                    C.set_axis(a,plane);
-                    v[vertices] = C;
-                    vertices += 1;
-                    x = false;
-                }
-
-                v0 = v1;
-            }
-            if vertices < 3
-            {
-                // nothing or degenerate
-                break;
-            }
-        }
-        // calculate bounding box
-        let mut bounds = AABB::from_empty();
-        for i in 0..vertices
-        {
-            bounds.grow(&v[i]);
-        }
-
-        Clipped
-        {
-            vertices: vertices as u32,
-            v,
-            bounds
-        }
-    }
 }
 
 impl Grid
@@ -173,7 +48,6 @@ impl Grid
 
             triangles.push(GridTriangle
             {
-                bounds: AABB::from_empty(),
                 internal_triangle: Triangle {
                     vertex0,
                     vertex1,
@@ -184,20 +58,7 @@ impl Grid
             tri_idx += 1;
         }
 
-        triangles.iter_mut().for_each(|triangle|
-        {
-            triangle.bounds = AABB::from_bounds(&triangle.internal_triangle.vertex0, &triangle.internal_triangle.vertex0);
-            triangle.bounds.grow(&triangle.internal_triangle.vertex1);
-            triangle.bounds.grow(&triangle.internal_triangle.vertex2);
-        });
-
-        let mut bounds: AABB = AABB::from_empty();
-
-        for triangle in &triangles
-        {
-            bounds.min_bound = bounds.min_bound.min(&triangle.bounds.min_bound);
-            bounds.max_bound = bounds.max_bound.max(&triangle.bounds.max_bound);
-        }
+        let bounds = mesh.bounds;
 
         let cell_size = Float3::from_xyz(
             (bounds.max_bound.x - bounds.min_bound.x) / (res_x as f32),

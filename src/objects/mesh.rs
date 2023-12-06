@@ -1,6 +1,7 @@
 use crate::math::*;
 use crate::objects::triangle::{intersect_triangle, Triangle};
 use crate::ray::*;
+use crate::objects::aabb::{AABB, intersect_aabb};
 
 pub struct Mesh
 {
@@ -10,7 +11,8 @@ pub struct Mesh
     pub obj_idx: usize,
     pub mat_idx: usize,
     pub t: Mat4,
-    pub inv_t: Mat4
+    pub inv_t: Mat4,
+    pub bounds: AABB
 }
 
 impl Mesh
@@ -43,6 +45,8 @@ impl Mesh
 
         let triangle_normals = Mesh::compute_normals(&triangles, &vertices, &transform);
 
+        let bounds = Mesh::compute_bounds(&vertices);
+
         Mesh
         {
             vertices,
@@ -51,7 +55,8 @@ impl Mesh
             obj_idx,
             mat_idx,
             t: transform,
-            inv_t: transform.inverted()
+            inv_t: transform.inverted(),
+            bounds
         }
     }
 
@@ -61,6 +66,7 @@ impl Mesh
         let triangles = vec![[0,2,1]];
 
         let triangle_normals = Mesh::compute_normals(&triangles, &vertices, &transform);
+        let bounds = Mesh::compute_bounds(&vertices);
 
         Mesh
         {
@@ -70,7 +76,8 @@ impl Mesh
             obj_idx,
             mat_idx,
             t: transform,
-            inv_t: transform.inverted()
+            inv_t: transform.inverted(),
+            bounds
         }
     }
 
@@ -78,6 +85,8 @@ impl Mesh
     {
         let triangle_normals = Mesh::compute_normals(&triangles, &vertices, &transform);
 
+        let bounds = Mesh::compute_bounds(&vertices);
+
         Mesh
         {
             vertices,
@@ -86,7 +95,8 @@ impl Mesh
             obj_idx,
             mat_idx,
             t: transform,
-            inv_t: transform.inverted()
+            inv_t: transform.inverted(),
+            bounds
         }
     }
 
@@ -104,6 +114,17 @@ impl Mesh
             triangle_normals.push(normalize(&transform_vector(&cross(&v0v1, &v0v2), transform)));
         }
         return triangle_normals;
+    }
+
+    fn compute_bounds(vertices: &Vec<Float3>) -> AABB
+    {
+        // calculate bounding box
+        let mut bounds = AABB::from_empty();
+        for v in vertices
+        {
+            bounds.grow(v);
+        }
+        return bounds;
     }
 
     fn intersect_triangle(&self, ray: &mut Ray, vertex0: usize, vertex1: usize, vertex2: usize, triangle_index: usize) -> bool
@@ -196,15 +217,26 @@ impl RayHittableObject for Mesh
         let mut ray_t = Ray::directed_distance(origin, direction, ray.t);
         ray_t.obj_idx = ray.obj_idx;
 
+        // check for intersection with boundary of mesh
+        let t = intersect_aabb(&mut ray_t, &self.bounds);
+        if t == 1e30
+        {
+            return;
+        }
+
+        let mut intersected = false;
         for (triangle_index, triangle) in self.triangles.iter().enumerate()
         {
-            if self.intersect_triangle(&mut ray_t, triangle[0], triangle[1], triangle[2], triangle_index)
-            {
-                ray.obj_idx = self.obj_idx;
-                ray.sub_obj_idx = ray_t.sub_obj_idx;
-                ray.t = ray_t.t;
-                ray.obj_type = RayHittableObjectType::Mesh;
-            }
+            intersected = self.intersect_triangle(&mut ray_t, triangle[0], triangle[1], triangle[2], triangle_index) || intersected;
+        }
+
+        ray.intersection_tests += ray_t.intersection_tests;
+        if intersected
+        {
+            ray.t = ray_t.t;
+            ray.obj_idx = self.obj_idx;
+            ray.sub_obj_idx = ray_t.sub_obj_idx;
+            ray.obj_type = RayHittableObjectType::Mesh;
         }
     }
 

@@ -212,14 +212,8 @@ impl BVH
         let mut root = BVHNode {
             left_first: 0,
             tri_count: prim_count,
-            bounds: AABB::from_empty()
+            bounds: mesh.bounds
         };
-
-        for triangle in &triangles
-        {
-            root.bounds.min_bound = root.bounds.min_bound.min(&triangle.bounds.min_bound);
-            root.bounds.max_bound = root.bounds.max_bound.max(&triangle.bounds.max_bound);
-        }
 
         bvh_nodes.push(root);
         for _ in 1..prim_count * 4
