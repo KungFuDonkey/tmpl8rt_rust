@@ -75,15 +75,7 @@ impl Scene
             meshes.push(mesh);
         }
 
-        let mut bvhs: Vec<BVH> = Vec::new();
-        let mut grids: Vec<Grid> = Vec::new();
-        for mesh in &meshes
-        {
-            bvhs.push(BVH::from_mesh(mesh, 128));
-            grids.push(Grid::from_mesh(mesh, 64, 64, 64));
-        }
-
-        Scene{
+        let mut scene = Scene{
             spheres: vec![
                 Sphere::new(0, 11, Float3::from_a(0.0), 0.3),
                 Sphere::new(1, 0, Float3::from_xyz( 0.0, 2.5, -3.07 ), 8.0)
@@ -109,10 +101,23 @@ impl Scene
                 Quad::new(3, 0, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, 1.0))),
             ],
             meshes,
-            bvhs,
-            grids,
+            bvhs: Vec::new(),
+            grids: Vec::new(),
             materials,
             animation_time: 0.0
+        };
+
+        scene.construct_acceleration_structures();
+
+        return scene;
+    }
+
+    fn construct_acceleration_structures(&mut self)
+    {
+        for mesh in &self.meshes
+        {
+            self.bvhs.push(BVH::from_mesh(mesh, 128));
+            self.grids.push(Grid::from_mesh(mesh, 64, 64, 64));
         }
     }
 

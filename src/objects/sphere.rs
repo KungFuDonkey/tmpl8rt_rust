@@ -14,6 +14,8 @@ pub struct Sphere
 impl RayHittableObject for Sphere
 {
     fn intersect(&self, ray: &mut Ray) {
+        ray.intersection_tests += 1;
+
         let oc = ray.origin - self.position;
         let b = dot(&oc, &ray.direction);
         let c = dot(&oc, &oc) - self.radius2;

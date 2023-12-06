@@ -24,7 +24,7 @@ pub struct Ray {
     pub obj_idx: usize,
     pub sub_obj_idx: usize,
     pub obj_type: RayHittableObjectType,
-    pub inside: bool
+    pub intersection_tests: u32
 }
 
 impl Ray {
@@ -40,7 +40,7 @@ impl Ray {
             obj_idx: usize::MAX,
             sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
-            inside: false
+            intersection_tests: 0
         }
     }
 
@@ -54,7 +54,7 @@ impl Ray {
             obj_idx: usize::MAX,
             sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
-            inside: false
+            intersection_tests: 0
         }
     }
 
@@ -69,7 +69,7 @@ impl Ray {
             obj_idx: usize::MAX,
             sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
-            inside: false
+            intersection_tests: 0
         }
     }
 

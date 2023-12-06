@@ -354,7 +354,7 @@ impl RayHittableObject for Grid
         ray_t.obj_type = ray.obj_type;
 
         // check for intersection with boundary of grid
-        let t = intersect_aabb(&ray_t, &self.bounds);
+        let t = intersect_aabb(&mut ray_t, &self.bounds);
         if t == 1e30
         {
             return;
@@ -505,6 +505,7 @@ impl RayHittableObject for Grid
             }
         }
 
+        ray.intersection_tests += ray_t.intersection_tests;
 
         if intersected
         {

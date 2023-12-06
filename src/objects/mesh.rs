@@ -108,6 +108,8 @@ impl Mesh
 
     fn intersect_triangle(&self, ray: &mut Ray, vertex0: usize, vertex1: usize, vertex2: usize, triangle_index: usize) -> bool
     {
+        ray.intersection_tests += 1;
+
         let v0 = self.vertices[vertex0];
         let v1 = self.vertices[vertex1];
         let v2 = self.vertices[vertex2];

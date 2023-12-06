@@ -13,6 +13,8 @@ pub struct Cube
 impl RayHittableObject for Cube
 {
     fn intersect(&self, ray: &mut Ray) {
+        ray.intersection_tests += 1;
+
         let origin = transform_position(&ray.origin, &self.inv_m);
         let direction = transform_vector(&ray.direction, &self.inv_m);
         let rdx = 1.0 / direction.x;

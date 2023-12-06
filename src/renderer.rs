@@ -11,7 +11,8 @@ pub enum RenderMode
 {
     Standard,
     Normals,
-    Distance
+    Distance,
+    Complexity
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]
@@ -52,11 +53,12 @@ impl Renderer
         let seed_base: u32 = 0x123456;
         let mut seed = init_seed(seed_base);
 
+        let render_mode = RenderMode::Complexity;
+
         Renderer{
             accumulator: vec![Float3::zero(); SCRWIDTH * SCRHEIGHT],
             random_seeds: vec![0; SCRWIDTH * SCRHEIGHT],
             render_target: Surface::new(),
-            render_mode: RenderMode::Normals,
             render_settings: RenderSettings {
                 max_bounces: 1,
                 lighting_mode: LightingMode::None,
@@ -65,7 +67,8 @@ impl Renderer
             },
             seed,
             accumulated_pixels: 0,
-            prev_render_mode: RenderMode::Normals,
+            render_mode,
+            prev_render_mode: render_mode,
             prev_lighting_mode: LightingMode::None
         }
     }
@@ -91,6 +94,21 @@ impl Renderer
             return Float3::zero();
         }
         return Float3::from_xyz(ray.t, ray.t, ray.t) * 0.1;
+    }
+
+    fn render_complexity(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings) -> Float3
+    {
+        scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
+
+        let r = ((ray.intersection_tests as f32) / 1000.0).min(1.0);
+        let g = ((1000 - ray.intersection_tests) as f32).max(0.0) / 1000.0;
+
+        if r > g
+        {
+            return Float3::from_xyz(r, 0.0, 0.0);
+        }
+
+        return Float3::from_xyz(0.0, g, 0.0);
     }
 
     fn get_lighting_color(ray: &Ray, scene: &Scene, intersection: &Float3, material: &Material, render_settings: &RenderSettings, seed: &mut u32) -> Float3
@@ -233,6 +251,20 @@ impl Renderer
                     let mut ray = camera.get_primary_ray_indexed(index);
                     let ray_color = Renderer::render_distances(&mut ray, &scene, &self.render_settings);
                     *value = rgbf32_to_rgb8_f3(&ray_color);
+                });
+            },
+            RenderMode::Complexity =>
+            {
+                self.accumulator.par_iter_mut().enumerate().for_each(|(index, value)|
+                {
+                    let mut ray = camera.get_primary_ray_indexed(index);
+                    *value = Renderer::render_complexity(&mut ray, &scene, &self.render_settings);
+                });
+
+                self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                {
+                    let acc_color = self.accumulator[index];
+                    *value = rgbf32_to_rgb8_f3(&acc_color);
                 });
             }
         }

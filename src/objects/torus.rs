@@ -60,6 +60,8 @@ impl Torus
 impl RayHittableObject for Torus
 {
     fn intersect(&self, ray: &mut Ray) {
+        ray.intersection_tests += 1;
+
         // via: https://www.shadertoy.com/view/4sBGDy
         let origin: Float3 = transform_position(&ray.origin, &self.inv_t );
         let distance: Float3 = transform_vector(&ray.direction, &self.inv_t);

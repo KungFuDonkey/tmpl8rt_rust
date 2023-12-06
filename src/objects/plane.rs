@@ -59,6 +59,8 @@ pub struct Plane
 impl RayHittableObject for Plane
 {
     fn intersect(&self, ray: &mut Ray) {
+        ray.intersection_tests += 1;
+
         let t = -(dot(&ray.origin, &self.normal) + self.distance) / (dot(&ray.direction, &self.normal));
         if t < ray.t && t > 0.0
         {

@@ -138,8 +138,10 @@ impl AABB
     }
 }
 
-pub fn intersect_aabb(ray: &Ray, aabb: &AABB) -> f32
+pub fn intersect_aabb(ray: &mut Ray, aabb: &AABB) -> f32
 {
+    ray.intersection_tests += 1;
+
     let tx1 = (aabb.min_bound.x - ray.origin.x) * ray.r_direction.x;
     let tx2 = (aabb.max_bound.x - ray.origin.x) * ray.r_direction.x;
     let mut tmin = tx1.min(tx2);

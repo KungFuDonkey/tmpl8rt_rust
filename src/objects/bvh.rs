@@ -705,7 +705,7 @@ impl RayHittableObject for BVH
             {
                 for i in 0..node.tri_count
                 {
-                    intersected = intersected || intersect_triangle(&self.triangles[self.triangle_idx[node.left_first + i]].internal_triangle, &mut ray_t)
+                    intersected = intersect_triangle(&self.triangles[self.triangle_idx[node.left_first + i]].internal_triangle, &mut ray_t) || intersected
                 }
 
                 if stack_ptr == 0
@@ -721,8 +721,8 @@ impl RayHittableObject for BVH
             }
             let mut child1 = &self.bvh_nodes[node.left_first];
             let mut child2 = &self.bvh_nodes[node.left_first + 1];
-            let mut dist1 = intersect_aabb( &ray_t, &child1.bounds );
-            let mut dist2 = intersect_aabb( &ray_t, &child2.bounds );
+            let mut dist1 = intersect_aabb( &mut ray_t, &child1.bounds );
+            let mut dist2 = intersect_aabb( &mut ray_t, &child2.bounds );
             if dist1 > dist2
             {
                 let tmp = dist1;
@@ -753,6 +753,7 @@ impl RayHittableObject for BVH
             }
         }
         ray.t = ray_t.t;
+        ray.intersection_tests += ray_t.intersection_tests;
         if intersected
         {
             ray.obj_idx = self.obj_idx;
