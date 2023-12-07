@@ -65,12 +65,12 @@ impl Scene
         let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 2.5)) * Mat4::scale(0.5);
 
         let mut meshes: Vec<Mesh> = Vec::new();
-        meshes.push(Mesh::triangle(0, 6, transform));
+        //meshes.push(Mesh::triangle(0, 6, transform));
 
-        let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 1.0)) * Mat4::scale(0.5);
-        meshes.push(Mesh::from_tri_file(1, 8, transform, std::path::Path::new("./assets/unity.tri")));
+        //let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 1.0)) * Mat4::scale(0.5);
+        //meshes.push(Mesh::from_tri_file(1, 8, transform, std::path::Path::new("./assets/unity.tri")));
 
-        let transform = Mat4::translate( &Float3::from_xyz(1.0, 0.0, 1.0)) * Mat4::scale(0.5);
+        let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 0.5)) * Mat4::scale(0.5);
         let (msh, mts) = load_obj(&std::path::Path::new("./assets/suzanne.obj"), meshes.len(), materials.len(), &transform);
 
         for mesh in msh
@@ -122,7 +122,7 @@ impl Scene
         {
             //self.bvhs.push(BVH::from_mesh(mesh, 128));
             self.grids.push(Grid::from_mesh(mesh, 64, 64, 64));
-            self.kd_trees.push(KDTree::from_mesh(mesh, 16, 2, 128));
+            self.kd_trees.push(KDTree::from_mesh(mesh, 4, 2, 128));
         }
     }
 
@@ -338,7 +338,7 @@ impl Scene
         let obj_idx = ray.obj_idx;
         if obj_idx == usize::MAX
         {
-            println!("ERROR: obj_idx not set or no object was hit");
+            println!("ERROR: obj_idx not set or no object was hit in get_normal()");
             return Float3::zero();
         }
 

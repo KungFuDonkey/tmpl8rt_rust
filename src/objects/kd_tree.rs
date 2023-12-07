@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::math::*;
 use crate::objects::aabb::*;
 use crate::objects::triangle::*;
@@ -49,6 +50,7 @@ impl KDTree
         let triangle_count = mesh.triangles.len();
         let mut triangles: Vec<KDTriangle> = Vec::with_capacity(triangle_count);
         let mut triangle_ids: Vec<usize> = Vec::with_capacity(triangle_count * 2);
+        let mut check_ids: HashSet<usize> = HashSet::with_capacity(triangle_count);
 
         let mut start_triangle_ids: Vec<usize> = Vec::with_capacity(triangle_count);
 
@@ -69,6 +71,7 @@ impl KDTree
             });
 
             start_triangle_ids.push(tri_idx as usize);
+            check_ids.insert(tri_idx as usize);
             tri_idx += 1;
         }
 
@@ -102,6 +105,19 @@ impl KDTree
 
         kd_tree.build_tree(&start_triangle_ids);
 
+        for triangle_id in &kd_tree.triangle_ids
+        {
+            if check_ids.contains(triangle_id)
+            {
+                check_ids.remove(triangle_id);
+            }
+        }
+
+        for triangle_id in &check_ids
+        {
+            println!("ERROR: {} is missing in kd_tree", triangle_id);
+        }
+
         return kd_tree;
     }
 
@@ -115,8 +131,9 @@ impl KDTree
     {
         let min_value = bounds.min_bound.get_axis(axis);
         let max_value = bounds.max_bound.get_axis(axis);
-        let step_size = (max_value - min_value) / (self.scan_samples as f32);
-        let mut best_value: f32 = -1.0;
+        let range = max_value - min_value;
+        let step_size = range / (self.scan_samples as f32);
+        let mut best_value: f32 = 1e30;
         let mut best_score: usize = 0;
 
         let mut current_value = min_value;
@@ -135,7 +152,7 @@ impl KDTree
         }
 
         // could not find any split with a score > 0, can happen when partitioning on y, but the object is flat
-        if best_value == -1.0
+        if best_value == 1e30
         {
             // take center
             best_value = (max_value + min_value) / 2.0;
@@ -208,11 +225,11 @@ impl KDTree
             let min_value = v0.min(v1.min(v2));
             let max_value = v0.max(v1.max(v2));
 
-            if max_value < plane_value
+            if max_value < plane_value - EPSILON
             {
                 left_triangles.push(id);
             }
-            else if min_value > plane_value
+            else if min_value > plane_value + EPSILON
             {
                 right_triangles.push(id);
             }
@@ -229,6 +246,11 @@ impl KDTree
     fn intersect_kd_node(&self, ray: &mut Ray, node_id: usize, depth: u32, bounds: &AABB) -> bool
     {
         ray.intersection_tests += 1;
+        let t = intersect_aabb(ray, bounds);
+        if t == 1e30
+        {
+            return false;
+        }
 
         let current_node = &self.kd_nodes[node_id];
 
@@ -245,6 +267,12 @@ impl KDTree
                 let triangle = &self.triangles[*i].internal_triangle;
                 intersected = intersect_triangle(triangle, ray) || intersected;
             }
+
+            if !intersected
+            {
+                ray.origin = ray.origin + ray.direction * t; // no epsilon as the bounds are already scaled with epsilon
+            }
+
             return intersected;
         }
 
@@ -277,18 +305,18 @@ impl KDTree
             if ray_origin_value <= current_node.plane_value
             {
                 let mut left_bounds = *bounds;
-                left_bounds.max_bound.set_axis(axis, current_node.plane_value);
+                left_bounds.max_bound.set_axis(axis, current_node.plane_value + EPSILON);
                 return self.intersect_kd_node(ray, current_node.left_first, depth + 1, &left_bounds);
             }
             let mut right_bounds = *bounds;
-            right_bounds.min_bound.set_axis(axis, current_node.plane_value);
+            right_bounds.min_bound.set_axis(axis, current_node.plane_value - EPSILON);
             return self.intersect_kd_node(ray, current_node.left_first + 1, depth + 1, &right_bounds);
         }
 
         let mut left_bounds = *bounds;
-        left_bounds.max_bound.set_axis(axis, current_node.plane_value);
+        left_bounds.max_bound.set_axis(axis, current_node.plane_value + EPSILON);
         let mut right_bounds = *bounds;
-        right_bounds.min_bound.set_axis(axis, current_node.plane_value);
+        right_bounds.min_bound.set_axis(axis, current_node.plane_value - EPSILON);
 
         // if there is a plane intersection -> determine intersection based on ordering from direction of ray
         let left_ordering = ray.direction.get_axis(axis) >= 0.0;
@@ -316,7 +344,11 @@ impl RayHittableObject for KDTree
             return;
         }
 
-        let bounds = self.bounds;
+        ray_t.origin = ray_t.origin + ray_t.direction * (t + EPSILON);
+
+        let mut bounds = self.bounds;
+        bounds.max_bound += EPSILON_VECTOR;
+        bounds.min_bound -= EPSILON_VECTOR;
         if self.intersect_kd_node(&mut ray_t, 0, 0, &bounds)
         {
             ray.t = ray_t.t;

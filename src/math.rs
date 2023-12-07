@@ -4,6 +4,7 @@ use std::cmp::max;
 use std::ops::*;
 
 pub const EPSILON: f32 = 0.00005;
+pub const EPSILON_VECTOR: Float3 = Float3 { x: EPSILON, y: EPSILON, z: EPSILON};
 
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy)]

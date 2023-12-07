@@ -360,7 +360,7 @@ impl RayHittableObject for Grid
                 }
             }
 
-            if intersected
+            if intersected && ray_t.t < t
             {
                 break;
             }
