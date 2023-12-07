@@ -246,11 +246,8 @@ impl KDTree
     fn intersect_kd_node(&self, ray: &mut Ray, node_id: usize, depth: u32, bounds: &AABB) -> bool
     {
         ray.intersection_tests += 1;
-        let t = intersect_aabb(ray, bounds);
-        if t == 1e30
-        {
-            return false;
-        }
+
+        let original_origin = ray.origin;
 
         let current_node = &self.kd_nodes[node_id];
 
@@ -268,11 +265,6 @@ impl KDTree
                 intersected = intersect_triangle(triangle, ray) || intersected;
             }
 
-            if !intersected
-            {
-                ray.origin = ray.origin + ray.direction * t; // no epsilon as the bounds are already scaled with epsilon
-            }
-
             return intersected;
         }
 
@@ -286,7 +278,7 @@ impl KDTree
         let mut plane_intersection = false;
         if t > 0.0
         {
-            let intersection_point = ray.origin + ray.direction * (t - 0.0001);
+            let intersection_point = ray.origin + ray.direction * t;
             let a1 = (axis + 1) % 3;
             let a2 = (axis + 2) % 3;
 
@@ -299,10 +291,12 @@ impl KDTree
             plane_intersection = min_a1 <= i_a1 && i_a1 <= max_a1 && min_a2 <= i_a2 && i_a2 <= max_a2;
         }
 
+        let left_ordering = ray_origin_value <= current_node.plane_value;
+
         // if there is none -> check on which side of the plane the ray started and take that side
         if !plane_intersection
         {
-            if ray_origin_value <= current_node.plane_value
+            if left_ordering
             {
                 let mut left_bounds = *bounds;
                 left_bounds.max_bound.set_axis(axis, current_node.plane_value + EPSILON);
@@ -318,13 +312,22 @@ impl KDTree
         let mut right_bounds = *bounds;
         right_bounds.min_bound.set_axis(axis, current_node.plane_value - EPSILON);
 
-        // if there is a plane intersection -> determine intersection based on ordering from direction of ray
-        let left_ordering = ray.direction.get_axis(axis) >= 0.0;
         if left_ordering
         {
-            return self.intersect_kd_node(ray, current_node.left_first, depth + 1, &left_bounds) || self.intersect_kd_node(ray, current_node.left_first + 1, depth + 1, &left_bounds);
+            if self.intersect_kd_node(ray, current_node.left_first, depth + 1, &left_bounds)
+            {
+                return true;
+            }
+            ray.origin = original_origin + ray.direction * t;
+            return self.intersect_kd_node(ray, current_node.left_first + 1, depth + 1, &right_bounds);
         }
-        return self.intersect_kd_node(ray, current_node.left_first + 1, depth + 1, &right_bounds) || self.intersect_kd_node(ray, current_node.left_first, depth + 1, &right_bounds);
+
+        if self.intersect_kd_node(ray, current_node.left_first + 1, depth + 1, &right_bounds)
+        {
+            return true;
+        }
+        ray.origin = original_origin + ray.direction * t;
+        return self.intersect_kd_node(ray, current_node.left_first, depth + 1, &left_bounds);
     }
 }
 
@@ -345,6 +348,13 @@ impl RayHittableObject for KDTree
         }
 
         ray_t.origin = ray_t.origin + ray_t.direction * (t + EPSILON);
+
+        // check for intersection with boundary of mesh
+        let t = intersect_aabb(&mut ray_t, &self.bounds);
+        if t == 1e30
+        {
+            return;
+        }
 
         let mut bounds = self.bounds;
         bounds.max_bound += EPSILON_VECTOR;
