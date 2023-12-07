@@ -8,3 +8,4 @@ pub mod mesh;
 pub mod grid;
 mod triangle;
 mod aabb;
+pub mod kd_tree;

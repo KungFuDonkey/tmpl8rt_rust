@@ -11,13 +11,15 @@ use crate::objects::quad::*;
 use crate::objects::mesh::*;
 use crate::objects::bvh::*;
 use crate::objects::grid::*;
+use crate::objects::kd_tree::*;
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum MeshIntersectionSetting
 {
     Raw,
     Bvh,
-    Grid
+    Grid,
+    KDTree
 }
 
 
@@ -31,6 +33,7 @@ pub struct Scene
     meshes: Vec<Mesh>,
     bvhs: Vec<BVH>,
     grids: Vec<Grid>,
+    kd_trees: Vec<KDTree>,
     materials: Vec<Material>,
     animation_time: f32,
 }
@@ -103,6 +106,7 @@ impl Scene
             meshes,
             bvhs: Vec::new(),
             grids: Vec::new(),
+            kd_trees: Vec::new(),
             materials,
             animation_time: 0.0
         };
@@ -116,8 +120,9 @@ impl Scene
     {
         for mesh in &self.meshes
         {
-            self.bvhs.push(BVH::from_mesh(mesh, 128));
+            //self.bvhs.push(BVH::from_mesh(mesh, 128));
             self.grids.push(Grid::from_mesh(mesh, 64, 64, 64));
+            self.kd_trees.push(KDTree::from_mesh(mesh, 16, 2, 128));
         }
     }
 
@@ -168,6 +173,13 @@ impl Scene
                 for grid in &self.grids
                 {
                     grid.intersect(ray);
+                }
+            }
+            MeshIntersectionSetting::KDTree =>
+            {
+                for kd_tree in &self.kd_trees
+                {
+                    kd_tree.intersect(ray);
                 }
             }
         }
@@ -232,6 +244,16 @@ impl Scene
                 for grid in &self.grids
                 {
                     if grid.is_occluded(ray)
+                    {
+                        return true;
+                    }
+                }
+            }
+            MeshIntersectionSetting::KDTree =>
+            {
+                for kd_tree in &self.kd_trees
+                {
+                    if kd_tree.is_occluded(ray)
                     {
                         return true;
                     }
@@ -362,6 +384,10 @@ impl Scene
             {
                 self.grids[obj_idx].get_normal(ray, i)
             }
+            RayHittableObjectType::KDTree =>
+            {
+                self.kd_trees[obj_idx].get_normal(ray, i)
+            }
         };
 
         if dot(&normal, &wo) > 0.0
@@ -412,6 +438,10 @@ impl Scene
             RayHittableObjectType::Grid =>
             {
                 self.grids[obj_idx as usize].mat_idx
+            },
+            RayHittableObjectType::KDTree =>
+            {
+                self.kd_trees[obj_idx].mat_idx
             }
         };
         &self.materials[mat_idx as usize]
@@ -459,6 +489,10 @@ impl Scene
             RayHittableObjectType::Grid =>
             {
                 self.grids[obj_idx].get_uv(i)
+            },
+            RayHittableObjectType::KDTree =>
+            {
+                self.kd_trees[obj_idx].get_uv(i)
             }
         }
     }
@@ -505,6 +539,10 @@ impl Scene
             RayHittableObjectType::Grid =>
             {
                 self.grids[obj_idx].intersect(ray)
+            },
+            RayHittableObjectType::KDTree =>
+            {
+                self.kd_trees[obj_idx].intersect(ray)
             }
         }
     }

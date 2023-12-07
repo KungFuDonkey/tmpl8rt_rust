@@ -42,6 +42,12 @@ impl AABB
         return va.x >= 0.0 && va.y >= 0.0 && va.z >= 0.0 && vb.x >= 0.0 && vb.y >= 0.0 && vb.z >= 0.0;
     }
 
+    pub fn contains2(&self, vector: &Float3) -> bool
+    {
+        return self.min_bound.x <= vector.x && self.min_bound.y <= vector.y && self.min_bound.z <= vector.z &&
+            self.max_bound.x >= vector.x && self.max_bound.y >= vector.y && self.max_bound.z >= vector.z;
+    }
+
     pub fn grow_aabb(&mut self, bb: &AABB)
     {
         self.min_bound = self.min_bound.min(&bb.min_bound);
@@ -251,5 +257,5 @@ pub fn intersect_aabb_triangle(aabb: &AABB, triangle: &Triangle, triangle_normal
 
 pub fn triangle_is_in_aabb(aabb: &AABB, triangle: &Triangle, triangle_normal: &Float3) -> bool
 {
-    aabb.contains(&triangle.vertex0) || aabb.contains(&triangle.vertex1) || aabb.contains(&triangle.vertex2) || intersect_aabb_triangle(aabb, triangle, triangle_normal)
+    aabb.contains2(&triangle.vertex0) || aabb.contains2(&triangle.vertex1) || aabb.contains2(&triangle.vertex2) || intersect_aabb_triangle(aabb, triangle, triangle_normal)
 }
