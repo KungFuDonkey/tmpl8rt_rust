@@ -122,7 +122,7 @@ impl Scene
         {
             //self.bvhs.push(BVH::from_mesh(mesh, 128));
             self.grids.push(Grid::from_mesh(mesh, 64, 64, 64));
-            self.kd_trees.push(KDTree::from_mesh(mesh, 4, 2, 128));
+            self.kd_trees.push(KDTree::from_mesh(mesh, 16, 2, 128));
         }
     }
 
