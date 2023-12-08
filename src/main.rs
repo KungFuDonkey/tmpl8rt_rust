@@ -78,6 +78,7 @@ fn main() {
         imgui_glfw.draw(ui, &mut window);
 
         window.swap_buffers();
+        input.tick();
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
             handle_window_event(&mut window, &event);
@@ -86,7 +87,7 @@ fn main() {
             match event {
                 glfw::WindowEvent::Key(key, _, action, _) =>
                 {
-                    input.set_key(key as u32, (action != Action::Release) as u32);
+                    input.set_key(key as u32, action != Action::Release);
                 }
                 glfw::WindowEvent::Focus(focussed) =>
                 {

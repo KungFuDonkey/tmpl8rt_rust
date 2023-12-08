@@ -69,13 +69,11 @@ impl Scene
         torus.inv_t = torus.t.inverted();
 
         let mut meshes: Vec<Mesh> = Vec::new();
-        //let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 2.5)) * Mat4::scale(0.5);
-        //meshes.push(Mesh::triangle(0, 6, transform));
 
-        //let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 1.0)) * Mat4::scale(0.5);
-        //meshes.push(Mesh::from_tri_file(1, 8, transform, std::path::Path::new("./assets/unity.tri")));
+        let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 1.0)) * Mat4::scale(0.5);
+        meshes.push(Mesh::from_tri_file(0, 8, transform, std::path::Path::new("./assets/unity.tri")));
 
-        let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 0.5)) * Mat4::scale(0.5);
+        let transform = Mat4::translate( &Float3::from_xyz(1.0, 0.0, 0.5)) * Mat4::scale(0.5);
         let (msh, mts) = load_obj(&std::path::Path::new("./assets/suzanne.obj"), meshes.len(), materials.len(), &transform);
 
         for mesh in msh
@@ -136,7 +134,7 @@ impl Scene
         for mesh in &self.meshes
         {
             self.grids.push(Grid::from_mesh(mesh, 64, 64, 64));
-            self.kd_trees.push(KDTree::from_mesh(mesh, 16, 2, 128));
+            self.kd_trees.push(KDTree::from_mesh(mesh, 12, 16, 128));
             self.bvh_4.push(BVH::from_mesh(mesh, 4));
             self.bvh_128.push(BVH::from_mesh(mesh, 128));
             self.bvh_spatial_4.push(BVH::from_mesh_spatial(mesh, 4));

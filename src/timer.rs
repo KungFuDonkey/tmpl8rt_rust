@@ -17,6 +17,11 @@ impl Timer
         return self.start.elapsed().as_millis();
     }
 
+    pub fn elapsed_seconds(&self) -> u64
+    {
+        return self.start.elapsed().as_secs();
+    }
+
     pub fn reset(&mut self)
     {
         self.start = std::time::Instant::now();
