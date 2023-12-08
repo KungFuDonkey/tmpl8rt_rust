@@ -64,6 +64,7 @@ impl Application
         ui.radio_button(ImString::new("Normals").deref(), &mut self.renderer.render_mode, RenderMode::Normals);
         ui.radio_button(ImString::new("Distance").deref(), &mut self.renderer.render_mode, RenderMode::Distance);
         ui.radio_button(ImString::new("Complexity").deref(), &mut self.renderer.render_mode, RenderMode::Complexity);
+        ui.radio_button(ImString::new("Complexity - Relative").deref(), &mut self.renderer.render_mode, RenderMode::RelativeComplexity);
 
         ui.text(ImString::new("Raytracing Settings:").deref());
         ui.slider_int(ImString::new("Bounces").deref(), &mut self.renderer.render_settings.max_bounces, 0, 8 ).build();

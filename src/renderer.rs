@@ -12,7 +12,8 @@ pub enum RenderMode
     Standard,
     Normals,
     Distance,
-    Complexity
+    Complexity,
+    RelativeComplexity
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]
@@ -29,7 +30,7 @@ pub struct RenderSettings
     pub lighting_mode: LightingMode,
     pub area_sample_size: i32,
     pub mesh_intersection_setting: MeshIntersectionSetting,
-    pub max_expected_intersection_tests: u32
+    pub max_expected_intersection_tests: u32,
 }
 
 
@@ -256,6 +257,31 @@ impl Renderer
                 });
 
                 let max = self.render_settings.max_expected_intersection_tests;
+
+                self.render_target.pixels.par_iter_mut().for_each(|value|
+                {
+                    let val = *value;
+                    let mut scaled_value = ((val as f32) / (max as f32)).min(1.0);
+                    if scaled_value < 0.5
+                    {
+                        scaled_value *= 2.0;
+                        *value = rgbf32_to_rgb8_f3(&Float3::from_xyz(0.0, scaled_value, 1.0 - scaled_value));
+                        return;
+                    }
+                    scaled_value = (scaled_value - 0.5) * 2.0;
+                    *value = rgbf32_to_rgb8_f3(&Float3::from_xyz(scaled_value, 1.0 - scaled_value, 0.0));
+
+                });
+            }
+            RenderMode::RelativeComplexity =>
+            {
+                self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                {
+                    let mut ray = camera.get_primary_ray_indexed(index);
+                    *value = Renderer::render_complexity(&mut ray, &scene, &self.render_settings);
+                });
+
+                let max = *self.render_target.pixels.par_iter().max().unwrap();
 
                 self.render_target.pixels.par_iter_mut().for_each(|value|
                 {
