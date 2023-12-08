@@ -28,7 +28,8 @@ pub struct RenderSettings
     pub max_bounces: i32,
     pub lighting_mode: LightingMode,
     pub area_sample_size: i32,
-    pub mesh_intersection_setting: MeshIntersectionSetting
+    pub mesh_intersection_setting: MeshIntersectionSetting,
+    pub max_expected_intersection_tests: u32
 }
 
 
@@ -63,7 +64,8 @@ impl Renderer
                 max_bounces: 1,
                 lighting_mode: LightingMode::None,
                 area_sample_size: 1,
-                mesh_intersection_setting: MeshIntersectionSetting::Grid
+                mesh_intersection_setting: MeshIntersectionSetting::Grid,
+                max_expected_intersection_tests: 1000
             },
             seed,
             accumulated_pixels: 0,
@@ -96,21 +98,11 @@ impl Renderer
         return Float3::from_xyz(ray.t, ray.t, ray.t) * 0.1;
     }
 
-    fn render_complexity(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings) -> Float3
+    fn render_complexity(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings) -> u32
     {
         scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
 
-        let intersection_tests = ray.intersection_tests as f32;
-
-        let r = (intersection_tests / 1000.0).min(1.0);
-        let g = (1000.0 - intersection_tests).max(0.0) / 1000.0;
-
-        if r > g
-        {
-            return Float3::from_xyz(r, 0.0, 0.0);
-        }
-
-        return Float3::from_xyz(0.0, g, 0.0);
+        return ray.intersection_tests;
     }
 
     fn get_lighting_color(ray: &Ray, scene: &Scene, intersection: &Float3, material: &Material, render_settings: &RenderSettings, seed: &mut u32) -> Float3
@@ -257,16 +249,27 @@ impl Renderer
             },
             RenderMode::Complexity =>
             {
-                self.accumulator.par_iter_mut().enumerate().for_each(|(index, value)|
+                self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
                 {
                     let mut ray = camera.get_primary_ray_indexed(index);
                     *value = Renderer::render_complexity(&mut ray, &scene, &self.render_settings);
                 });
 
-                self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
+                let max = self.render_settings.max_expected_intersection_tests;
+
+                self.render_target.pixels.par_iter_mut().for_each(|value|
                 {
-                    let acc_color = self.accumulator[index];
-                    *value = rgbf32_to_rgb8_f3(&acc_color);
+                    let val = *value;
+                    let mut scaled_value = ((val as f32) / (max as f32)).min(1.0);
+                    if scaled_value < 0.5
+                    {
+                        scaled_value *= 2.0;
+                        *value = rgbf32_to_rgb8_f3(&Float3::from_xyz(0.0, scaled_value, 1.0 - scaled_value));
+                        return;
+                    }
+                    scaled_value = (scaled_value - 0.5) * 2.0;
+                    *value = rgbf32_to_rgb8_f3(&Float3::from_xyz(scaled_value, 1.0 - scaled_value, 0.0));
+
                 });
             }
         }
