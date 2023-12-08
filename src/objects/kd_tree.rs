@@ -243,11 +243,9 @@ impl KDTree
         return (left_triangles, right_triangles)
     }
 
-    fn intersect_kd_node(&self, ray: &mut Ray, node_id: usize, depth: u32, bounds: &AABB) -> bool
+    fn intersect_kd_node(&self, ray: &mut Ray, current_t: f32, node_id: usize, depth: u32, bounds: &AABB) -> bool
     {
         ray.intersection_tests += 1;
-
-        let original_origin = ray.origin;
 
         let current_node = &self.kd_nodes[node_id];
 
@@ -271,14 +269,15 @@ impl KDTree
         let axis = (depth % 3) as usize;
 
         // check if there is a plane intersection WITHIN the bounds of the current node (and positive)
-        let ray_origin_value = ray.origin.get_axis(axis);
+        let current_origin_point = ray.origin + ray.direction * current_t;
         let ray_direction_value = ray.direction.get_axis(axis);
+        let ray_origin_value = current_origin_point.get_axis(axis);
         let distance = current_node.plane_value - ray_origin_value;
         let t = distance / ray_direction_value;
         let mut plane_intersection = false;
         if t > 0.0
         {
-            let intersection_point = ray.origin + ray.direction * t;
+            let intersection_point = current_origin_point + ray.direction * t;
             let a1 = (axis + 1) % 3;
             let a2 = (axis + 2) % 3;
 
@@ -300,12 +299,14 @@ impl KDTree
             {
                 let mut left_bounds = *bounds;
                 left_bounds.max_bound.set_axis(axis, current_node.plane_value + EPSILON);
-                return self.intersect_kd_node(ray, current_node.left_first, depth + 1, &left_bounds);
+                return self.intersect_kd_node(ray, current_t, current_node.left_first, depth + 1, &left_bounds);
             }
             let mut right_bounds = *bounds;
             right_bounds.min_bound.set_axis(axis, current_node.plane_value - EPSILON);
-            return self.intersect_kd_node(ray, current_node.left_first + 1, depth + 1, &right_bounds);
+            return self.intersect_kd_node(ray, current_t, current_node.left_first + 1, depth + 1, &right_bounds);
         }
+
+        let t = current_t + t;
 
         let mut left_bounds = *bounds;
         left_bounds.max_bound.set_axis(axis, current_node.plane_value + EPSILON);
@@ -314,20 +315,23 @@ impl KDTree
 
         if left_ordering
         {
-            if self.intersect_kd_node(ray, current_node.left_first, depth + 1, &left_bounds)
+            let intersection = self.intersect_kd_node(ray, current_t, current_node.left_first, depth + 1, &left_bounds);
+
+            if intersection && ray.t < t
             {
                 return true;
             }
-            ray.origin = original_origin + ray.direction * t;
-            return self.intersect_kd_node(ray, current_node.left_first + 1, depth + 1, &right_bounds);
+
+            return self.intersect_kd_node(ray, t, current_node.left_first + 1, depth + 1, &right_bounds) || intersection;
         }
 
-        if self.intersect_kd_node(ray, current_node.left_first + 1, depth + 1, &right_bounds)
+        let intersection = self.intersect_kd_node(ray, current_t, current_node.left_first + 1, depth + 1, &right_bounds);
+
+        if intersection && ray.t < t
         {
             return true;
         }
-        ray.origin = original_origin + ray.direction * t;
-        return self.intersect_kd_node(ray, current_node.left_first, depth + 1, &left_bounds);
+        return self.intersect_kd_node(ray, t, current_node.left_first, depth + 1, &left_bounds) || intersection;
     }
 }
 
@@ -347,19 +351,10 @@ impl RayHittableObject for KDTree
             return;
         }
 
-        ray_t.origin = ray_t.origin + ray_t.direction * (t + EPSILON);
-
-        // check for intersection with boundary of mesh
-        let t = intersect_aabb(&mut ray_t, &self.bounds);
-        if t == 1e30
-        {
-            return;
-        }
-
         let mut bounds = self.bounds;
         bounds.max_bound += EPSILON_VECTOR;
         bounds.min_bound -= EPSILON_VECTOR;
-        if self.intersect_kd_node(&mut ray_t, 0, 0, &bounds)
+        if self.intersect_kd_node(&mut ray_t, t,0, 0, &bounds)
         {
             ray.t = ray_t.t;
             ray.obj_type = RayHittableObjectType::KDTree;
