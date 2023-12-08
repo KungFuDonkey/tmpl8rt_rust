@@ -83,7 +83,7 @@ impl Renderer
             return Float3::zero();
         }
         let intersection = ray.intersection_point();
-        let normal = scene.get_normal(ray, &intersection, &ray.direction);
+        let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
 
         return (normal + 1.0) * 0.5;
     }
@@ -109,8 +109,8 @@ impl Renderer
     {
         let lighting: Float3 = match render_settings.lighting_mode {
             LightingMode::None => Float3::from_a(1.0),
-            LightingMode::HardShadows => scene.direct_lighting_hard(&intersection, &scene.get_normal(ray, &intersection, &ray.direction), &render_settings.mesh_intersection_setting),
-            LightingMode::SoftShadows => scene.direct_lighting_soft(&intersection, &scene.get_normal(ray, &intersection, &ray.direction), render_settings.area_sample_size as usize, seed, &render_settings.mesh_intersection_setting)
+            LightingMode::HardShadows => scene.direct_lighting_hard(&intersection, &scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting), &render_settings.mesh_intersection_setting),
+            LightingMode::SoftShadows => scene.direct_lighting_soft(&intersection, &scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting), render_settings.area_sample_size as usize, seed, &render_settings.mesh_intersection_setting)
         };
         return lighting * Self::get_color_from_material(ray, scene, &intersection, material);
     }
@@ -134,7 +134,7 @@ impl Renderer
         {
             Material::ReflectiveMaterial(reflection_material, reflectivity) =>
             {
-                let normal = scene.get_normal(ray, &intersection, &ray.direction);
+                let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
                 let reflected_ray_direction = reflect(&ray.direction, &normal);
                 let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
                 let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, reflection_material);
@@ -143,7 +143,7 @@ impl Renderer
             }
             Material::FullyReflectiveMaterial(reflection_material) =>
             {
-                let normal = scene.get_normal(ray, &intersection, &ray.direction);
+                let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
                 let reflected_ray_direction = reflect(&ray.direction, &normal);
                 let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
                 let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, reflection_material);
@@ -153,7 +153,7 @@ impl Renderer
             {
                 // assumes no collisions with any other objects, so a full glass ball with no objects inside
 
-                let normal = scene.get_normal(ray, &intersection, &ray.direction);
+                let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
                 let reversed_dir = -ray.direction;
                 let theta1 = dot( &normal, &reversed_dir);
                 let theta1_2 = theta1 * theta1;
@@ -172,8 +172,8 @@ impl Renderer
                 let mut refract_ray = Ray::directed(intersection + EPSILON * refract_direction, refract_direction);
 
                 // only do self intersection
-                scene.intersect_object(&mut refract_ray, ray.obj_idx as usize, ray.obj_type);
-                let refract_normal = scene.get_normal(&refract_ray, &intersection, &refract_direction);
+                scene.intersect_object(&mut refract_ray, ray.obj_idx as usize, ray.obj_type, &render_settings.mesh_intersection_setting);
+                let refract_normal = scene.get_normal(&refract_ray, &intersection, &refract_direction, &render_settings.mesh_intersection_setting);
                 let reversed_refract_dir = -refract_direction;
                 let theta1 = dot (&refract_normal, &reversed_refract_dir);
                 let theta1_2 = theta1 * theta1;

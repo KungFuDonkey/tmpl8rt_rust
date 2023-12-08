@@ -50,7 +50,6 @@ impl KDTree
         let triangle_count = mesh.triangles.len();
         let mut triangles: Vec<KDTriangle> = Vec::with_capacity(triangle_count);
         let mut triangle_ids: Vec<usize> = Vec::with_capacity(triangle_count * 2);
-        let mut check_ids: HashSet<usize> = HashSet::with_capacity(triangle_count);
 
         let mut start_triangle_ids: Vec<usize> = Vec::with_capacity(triangle_count);
 
@@ -71,7 +70,6 @@ impl KDTree
             });
 
             start_triangle_ids.push(tri_idx as usize);
-            check_ids.insert(tri_idx as usize);
             tri_idx += 1;
         }
 
@@ -104,19 +102,6 @@ impl KDTree
         };
 
         kd_tree.build_tree(&start_triangle_ids);
-
-        for triangle_id in &kd_tree.triangle_ids
-        {
-            if check_ids.contains(triangle_id)
-            {
-                check_ids.remove(triangle_id);
-            }
-        }
-
-        for triangle_id in &check_ids
-        {
-            println!("ERROR: {} is missing in kd_tree", triangle_id);
-        }
 
         return kd_tree;
     }

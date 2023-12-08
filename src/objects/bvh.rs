@@ -12,7 +12,7 @@ struct BVHTriangle
 }                                   // 64 bytes
 
 #[derive(Clone, Copy)]
-pub struct BVHNode
+struct BVHNode
 {
     pub bounds: AABB,
     pub tri_count: usize,
@@ -160,6 +160,7 @@ pub struct BVH
     pub nodes_used: usize,
     pub triangle_ptr: usize,
     pub spatial_splits: usize,
+    pub is_spatial: bool,
     pub t: Mat4,
     pub inv_t: Mat4,
     pub normals: Vec<Float3>,
@@ -171,6 +172,95 @@ pub struct BVH
 impl BVH
 {
     pub fn from_mesh(mesh: &Mesh, bin_size: usize) -> Self
+    {
+        let prim_count = mesh.triangles.len();
+        let mut triangles: Vec<BVHTriangle> = Vec::with_capacity(prim_count);
+        let mut triangle_idx: Vec<usize> = Vec::with_capacity(prim_count);
+
+        let mut tri_idx = 0;
+        for triangle in &mesh.triangles
+        {
+            let vertex0 = mesh.vertices[triangle[0]];
+            let vertex1 = mesh.vertices[triangle[1]];
+            let vertex2 = mesh.vertices[triangle[2]];
+
+            triangles.push(BVHTriangle
+            {
+                bounds: AABB::from_empty(),
+                internal_triangle: Triangle{
+                    vertex0,
+                    vertex1,
+                    vertex2,
+                    tri_idx,
+                },
+            });
+            triangle_idx.push(tri_idx as usize);
+            tri_idx += 1;
+        }
+
+        // build bvh
+        let mut bvh_nodes: Vec<BVHNode> = Vec::with_capacity(prim_count * 2);
+
+        triangles.iter_mut().for_each(|triangle|
+        {
+            triangle.bounds = AABB::from_bounds(&triangle.internal_triangle.vertex0, &triangle.internal_triangle.vertex0);
+            triangle.bounds.grow(&triangle.internal_triangle.vertex1);
+            triangle.bounds.grow(&triangle.internal_triangle.vertex2);
+        });
+
+        let mut root = BVHNode {
+            left_first: 0,
+            tri_count: prim_count,
+            bounds: mesh.bounds
+        };
+
+        bvh_nodes.push(root);
+        for _ in 1..prim_count * 2
+        {
+            bvh_nodes.push(
+                BVHNode {
+                    left_first: 0,
+                    tri_count: 0,
+                    bounds: AABB::from_empty()
+                }
+            );
+        }
+
+        let root_node_idx: usize = 0;
+
+        let spatial_splits: usize = 0;
+
+        let mut bvh = BVH
+        {
+            triangles,
+            bvh_nodes,
+            triangle_idx,
+            triangle_tmp: Vec::new(),
+            root_node_idx,
+            nodes_used: 2,
+            triangle_ptr: prim_count,
+            spatial_splits,
+            is_spatial: false,
+            t: mesh.t,
+            inv_t: mesh.inv_t,
+            normals: mesh.triangle_normals.to_vec(),
+            obj_idx: mesh.obj_idx,
+            mat_idx: mesh.mat_idx,
+            bin_size
+        };
+
+        bvh.subdivide(root_node_idx, 0);
+
+        println!("SAH:            {}", bvh.get_total_sah(0));
+        println!("nodes:          {}", bvh.get_node_count(0));
+        println!("leafs:          {}", bvh.get_leaf_count(0));
+        println!("spatial splits: {}", bvh.spatial_splits);
+        println!("SAH cost:       {}", bvh.sah_cost(0));
+
+        return bvh;
+    }
+
+    pub fn from_mesh_spatial(mesh: &Mesh, bin_size: usize) -> Self
     {
         let prim_count = mesh.triangles.len();
         let mut triangles: Vec<BVHTriangle> = Vec::with_capacity(prim_count * 2);
@@ -203,11 +293,11 @@ impl BVH
         let mut bvh_nodes: Vec<BVHNode> = Vec::with_capacity(prim_count * 4);
 
         triangles.iter_mut().for_each(|triangle|
-        {
-            triangle.bounds = AABB::from_bounds(&triangle.internal_triangle.vertex0, &triangle.internal_triangle.vertex0);
-            triangle.bounds.grow(&triangle.internal_triangle.vertex1);
-            triangle.bounds.grow(&triangle.internal_triangle.vertex2);
-        });
+            {
+                triangle.bounds = AABB::from_bounds(&triangle.internal_triangle.vertex0, &triangle.internal_triangle.vertex0);
+                triangle.bounds.grow(&triangle.internal_triangle.vertex1);
+                triangle.bounds.grow(&triangle.internal_triangle.vertex2);
+            });
 
         let mut root = BVHNode {
             left_first: 0,
@@ -257,6 +347,7 @@ impl BVH
             nodes_used: 2,
             triangle_ptr: prim_count,
             spatial_splits,
+            is_spatial: true,
             t: mesh.t,
             inv_t: mesh.inv_t,
             normals: mesh.triangle_normals.to_vec(),
@@ -501,120 +592,124 @@ impl BVH
 
         let mut obj_split_cost = self.find_best_object_split_plane(&node, &mut obj_split_axis, &mut obj_split_pos, &mut left_box, &mut right_box);
 
-        let root_area = self.bvh_nodes[0].bounds.area();
-        let lambda = left_box.intersection( &right_box ).area() / root_area;
-
-        if lambda > 1e-5
+        if self.is_spatial
         {
-            let mut n_left: usize = 0;
-            let mut n_right: usize = 0;
-            let mut bounds_left = AABB::from_empty();
-            let mut bounds_right = AABB::from_empty();
+            let root_area = self.bvh_nodes[0].bounds.area();
+            let lambda = left_box.intersection( &right_box ).area() / root_area;
 
-            let mut spatial_split_cost = self.find_best_spatial_split_plane(&node, &mut spatial_split_axis, &mut spatial_split_pos, &mut n_left, &mut n_right, &mut bounds_left, &mut bounds_right, &mut splitted);
-
-            if spatial_split_cost < obj_split_cost && splitted < (slack as i32)
+            if lambda > 1e-5
             {
-                if spatial_split_cost >= no_split_cost
+                let mut n_left: usize = 0;
+                let mut n_right: usize = 0;
+                let mut bounds_left = AABB::from_empty();
+                let mut bounds_right = AABB::from_empty();
+
+                let mut spatial_split_cost = self.find_best_spatial_split_plane(&node, &mut spatial_split_axis, &mut spatial_split_pos, &mut n_left, &mut n_right, &mut bounds_left, &mut bounds_right, &mut splitted);
+
+                if spatial_split_cost < obj_split_cost && splitted < (slack as i32)
                 {
-                    return; // don't split, not worth it
-                }
-                let mut left_of_split = node.bounds.clone();
-                let mut right_of_split = node.bounds.clone();
-                left_of_split.max_bound.set_axis(spatial_split_axis, spatial_split_pos);
-                right_of_split.min_bound.set_axis(spatial_split_axis, spatial_split_pos);
-
-                let mut left_pos = node.left_first;
-                let mut left_count: usize = 0;
-                let mut right_pos = node.left_first + node.tri_count + slack;
-                let mut right_count: usize = 0;
-
-                for i in 0..node.tri_count
-                {
-                    let mut idx = self.triangle_idx[node.left_first + i];
-                    let mut left_part = Clipped::new(&self.triangles[idx], &left_of_split);
-                    let mut right_part = Clipped::new(&self.triangles[idx], &right_of_split);
-                    let mut in_left = left_part.vertices >= 3;
-                    let mut in_right = right_part.vertices >= 3;
-
-                    if in_left && in_right
+                    if spatial_split_cost >= no_split_cost
                     {
-                        let c1 = bounds_left.union(&self.triangles[idx].bounds).area() * (n_left as f32) + bounds_right.area() * ((n_right - 1) as f32);
-                        let c2 = bounds_left.area() * ((n_left - 1) as f32) + bounds_right.union( &self.triangles[idx].bounds ).area() * (n_right as f32);
-                        if c1 < spatial_split_cost || c2 < spatial_split_cost
+                        return; // don't split, not worth it
+                    }
+                    let mut left_of_split = node.bounds.clone();
+                    let mut right_of_split = node.bounds.clone();
+                    left_of_split.max_bound.set_axis(spatial_split_axis, spatial_split_pos);
+                    right_of_split.min_bound.set_axis(spatial_split_axis, spatial_split_pos);
+
+                    let mut left_pos = node.left_first;
+                    let mut left_count: usize = 0;
+                    let mut right_pos = node.left_first + node.tri_count + slack;
+                    let mut right_count: usize = 0;
+
+                    for i in 0..node.tri_count
+                    {
+                        let mut idx = self.triangle_idx[node.left_first + i];
+                        let mut left_part = Clipped::new(&self.triangles[idx], &left_of_split);
+                        let mut right_part = Clipped::new(&self.triangles[idx], &right_of_split);
+                        let mut in_left = left_part.vertices >= 3;
+                        let mut in_right = right_part.vertices >= 3;
+
+                        if in_left && in_right
                         {
-                            if c1 < c2
+                            let c1 = bounds_left.union(&self.triangles[idx].bounds).area() * (n_left as f32) + bounds_right.area() * ((n_right - 1) as f32);
+                            let c2 = bounds_left.area() * ((n_left - 1) as f32) + bounds_right.union( &self.triangles[idx].bounds ).area() * (n_right as f32);
+                            if c1 < spatial_split_cost || c2 < spatial_split_cost
                             {
-                                spatial_split_cost = c1;
-                                n_right -= 1;
-                                bounds_left.grow_aabb( &self.triangles[idx].bounds );
-                                left_part.bounds = self.triangles[idx].bounds;
-                                in_right = false; // undo clip
-                            }
-                            else {
-                                spatial_split_cost = c2;
-                                n_left -= 1;
-                                bounds_right.grow_aabb( &self.triangles[idx].bounds );
-                                right_part.bounds = self.triangles[idx].bounds;
-                                in_left = false; // undo clip
+                                if c1 < c2
+                                {
+                                    spatial_split_cost = c1;
+                                    n_right -= 1;
+                                    bounds_left.grow_aabb( &self.triangles[idx].bounds );
+                                    left_part.bounds = self.triangles[idx].bounds;
+                                    in_right = false; // undo clip
+                                }
+                                else {
+                                    spatial_split_cost = c2;
+                                    n_left -= 1;
+                                    bounds_right.grow_aabb( &self.triangles[idx].bounds );
+                                    right_part.bounds = self.triangles[idx].bounds;
+                                    in_left = false; // undo clip
+                                }
                             }
                         }
-                    }
 
-                    if in_left
-                    {
-                        self.triangle_idx[left_pos] = idx;
-                        left_pos += 1;
-                        self.triangles[idx].bounds = left_part.bounds;
-                        left_count += 1;
-                    }
-                    if in_right
-                    {
                         if in_left
                         {
-                            self.triangles[self.triangle_ptr] = self.triangles[idx].clone();
-                            idx = self.triangle_ptr;
-                            self.triangle_ptr += 1;
+                            self.triangle_idx[left_pos] = idx;
+                            left_pos += 1;
+                            self.triangles[idx].bounds = left_part.bounds;
+                            left_count += 1;
                         }
-                        right_pos -= 1;
-                        self.triangle_tmp[right_pos] = idx;
-                        self.triangles[idx].bounds = right_part.bounds;
-                        right_count += 1;
+                        if in_right
+                        {
+                            if in_left
+                            {
+                                self.triangles[self.triangle_ptr] = self.triangles[idx].clone();
+                                idx = self.triangle_ptr;
+                                self.triangle_ptr += 1;
+                            }
+                            right_pos -= 1;
+                            self.triangle_tmp[right_pos] = idx;
+                            self.triangles[idx].bounds = right_part.bounds;
+                            right_count += 1;
+                        }
                     }
+
+                    let slack = ((slack as i32) - splitted) as usize;
+                    let half_slack = slack / 2;
+
+                    let triangle_idx_adr = node.left_first + left_count + half_slack;
+                    let triangle_tmp_adr = right_pos;
+
+                    for i in 0..right_count
+                    {
+                        self.triangle_idx[triangle_idx_adr + i] = self.triangle_tmp[triangle_tmp_adr + i];
+                    }
+
+                    let left_child_idx = self.nodes_used;
+                    self.nodes_used += 1;
+                    let right_child_idx = self.nodes_used;
+                    self.nodes_used += 1;
+
+                    self.bvh_nodes[left_child_idx].left_first = node.left_first;
+                    self.bvh_nodes[left_child_idx].tri_count = left_count;
+                    self.bvh_nodes[right_child_idx].left_first = node.left_first + left_count + half_slack;
+                    self.bvh_nodes[right_child_idx].tri_count = right_count;
+
+                    self.bvh_nodes[node_idx].left_first = left_child_idx;
+                    self.bvh_nodes[node_idx].tri_count = 0;
+
+                    self.bvh_nodes[left_child_idx].bounds = bounds_left;
+                    self.bvh_nodes[right_child_idx].bounds = bounds_right;
+                    self.spatial_splits += 1;
+                    self.subdivide(left_child_idx, half_slack);
+                    self.subdivide(right_child_idx, half_slack);
+                    return;
                 }
-
-                let slack = ((slack as i32) - splitted) as usize;
-                let half_slack = slack / 2;
-
-                let triangle_idx_adr = node.left_first + left_count + half_slack;
-                let triangle_tmp_adr = right_pos;
-
-                for i in 0..right_count
-                {
-                    self.triangle_idx[triangle_idx_adr + i] = self.triangle_tmp[triangle_tmp_adr + i];
-                }
-
-                let left_child_idx = self.nodes_used;
-                self.nodes_used += 1;
-                let right_child_idx = self.nodes_used;
-                self.nodes_used += 1;
-
-                self.bvh_nodes[left_child_idx].left_first = node.left_first;
-                self.bvh_nodes[left_child_idx].tri_count = left_count;
-                self.bvh_nodes[right_child_idx].left_first = node.left_first + left_count + half_slack;
-                self.bvh_nodes[right_child_idx].tri_count = right_count;
-
-                self.bvh_nodes[node_idx].left_first = left_child_idx;
-                self.bvh_nodes[node_idx].tri_count = 0;
-
-                self.bvh_nodes[left_child_idx].bounds = bounds_left;
-                self.bvh_nodes[right_child_idx].bounds = bounds_right;
-                self.spatial_splits += 1;
-                self.subdivide(left_child_idx, half_slack);
-                self.subdivide(right_child_idx, half_slack);
-                return;
             }
         }
+
         if obj_split_cost >= no_split_cost
         {
             return;

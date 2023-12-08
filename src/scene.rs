@@ -17,7 +17,10 @@ use crate::objects::kd_tree::*;
 pub enum MeshIntersectionSetting
 {
     Raw,
-    Bvh,
+    Bvh4,
+    Bvh128,
+    BvhSpatial4,
+    BvhSpatial128,
     Grid,
     KDTree
 }
@@ -31,7 +34,10 @@ pub struct Scene
     tori: Vec<Torus>,
     quads: Vec<Quad>,
     meshes: Vec<Mesh>,
-    bvhs: Vec<BVH>,
+    bvh_4: Vec<BVH>,
+    bvh_128: Vec<BVH>,
+    bvh_spatial_4: Vec<BVH>,
+    bvh_spatial_128: Vec<BVH>,
     grids: Vec<Grid>,
     kd_trees: Vec<KDTree>,
     materials: Vec<Material>,
@@ -104,7 +110,10 @@ impl Scene
                 Quad::new(3, 0, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, 1.0))),
             ],
             meshes,
-            bvhs: Vec::new(),
+            bvh_4: Vec::new(),
+            bvh_spatial_4: Vec::new(),
+            bvh_128: Vec::new(),
+            bvh_spatial_128: Vec::new(),
             grids: Vec::new(),
             kd_trees: Vec::new(),
             materials,
@@ -120,9 +129,12 @@ impl Scene
     {
         for mesh in &self.meshes
         {
-            //self.bvhs.push(BVH::from_mesh(mesh, 128));
             self.grids.push(Grid::from_mesh(mesh, 64, 64, 64));
             self.kd_trees.push(KDTree::from_mesh(mesh, 16, 2, 128));
+            self.bvh_4.push(BVH::from_mesh(mesh, 4));
+            self.bvh_128.push(BVH::from_mesh(mesh, 128));
+            self.bvh_spatial_4.push(BVH::from_mesh_spatial(mesh, 4));
+            self.bvh_spatial_128.push(BVH::from_mesh_spatial(mesh, 128));
         }
     }
 
@@ -160,21 +172,42 @@ impl Scene
                 {
                     mesh.intersect(ray);
                 }
-            }
-            MeshIntersectionSetting::Bvh =>
+            },
+            MeshIntersectionSetting::Bvh4 =>
             {
-                for bvh in &self.bvhs
+                for bvh in &self.bvh_4
                 {
                     bvh.intersect(ray);
                 }
-            }
+            },
+            MeshIntersectionSetting::Bvh128 =>
+            {
+                for bvh in &self.bvh_128
+                {
+                    bvh.intersect(ray);
+                }
+            },
+            MeshIntersectionSetting::BvhSpatial4 =>
+            {
+                for bvh in &self.bvh_spatial_4
+                {
+                    bvh.intersect(ray);
+                }
+            },
+            MeshIntersectionSetting::BvhSpatial128 =>
+            {
+                for bvh in &self.bvh_spatial_128
+                {
+                    bvh.intersect(ray);
+                }
+            },
             MeshIntersectionSetting::Grid =>
             {
                 for grid in &self.grids
                 {
                     grid.intersect(ray);
                 }
-            }
+            },
             MeshIntersectionSetting::KDTree =>
             {
                 for kd_tree in &self.kd_trees
@@ -231,8 +264,35 @@ impl Scene
                     }
                 }
             }
-            MeshIntersectionSetting::Bvh => {
-                for bvh in &self.bvhs
+            MeshIntersectionSetting::Bvh4 => {
+                for bvh in &self.bvh_4
+                {
+                    if bvh.is_occluded(ray)
+                    {
+                        return true;
+                    }
+                }
+            }
+            MeshIntersectionSetting::BvhSpatial4 => {
+                for bvh in &self.bvh_spatial_4
+                {
+                    if bvh.is_occluded(ray)
+                    {
+                        return true;
+                    }
+                }
+            }
+            MeshIntersectionSetting::Bvh128 => {
+                for bvh in &self.bvh_128
+                {
+                    if bvh.is_occluded(ray)
+                    {
+                        return true;
+                    }
+                }
+            }
+            MeshIntersectionSetting::BvhSpatial128 => {
+                for bvh in &self.bvh_spatial_128
                 {
                     if bvh.is_occluded(ray)
                     {
@@ -333,7 +393,7 @@ impl Scene
     }
 
 
-    pub fn get_normal(&self, ray: &Ray, i: &Float3, wo: &Float3) -> Float3
+    pub fn get_normal(&self, ray: &Ray, i: &Float3, wo: &Float3, mesh_intersection_setting: &MeshIntersectionSetting) -> Float3
     {
         let obj_idx = ray.obj_idx;
         if obj_idx == usize::MAX
@@ -378,7 +438,14 @@ impl Scene
             }
             RayHittableObjectType::Bvh =>
             {
-                self.bvhs[obj_idx].get_normal(ray, i)
+                match mesh_intersection_setting
+                {
+                    MeshIntersectionSetting::Bvh4 => self.bvh_4[obj_idx].get_normal(ray, i),
+                    MeshIntersectionSetting::Bvh128 => self.bvh_128[obj_idx].get_normal(ray, i),
+                    MeshIntersectionSetting::BvhSpatial4 => self.bvh_spatial_4[obj_idx].get_normal(ray, i),
+                    MeshIntersectionSetting::BvhSpatial128 => self.bvh_spatial_128[obj_idx].get_normal(ray, i),
+                    _ => Float3::zero()
+                }
             }
             RayHittableObjectType::Grid =>
             {
@@ -433,7 +500,7 @@ impl Scene
             },
             RayHittableObjectType::Bvh =>
             {
-                self.bvhs[obj_idx as usize].mat_idx
+                self.meshes[obj_idx as usize].mat_idx
             },
             RayHittableObjectType::Grid =>
             {
@@ -484,7 +551,7 @@ impl Scene
             },
             RayHittableObjectType::Bvh =>
             {
-                self.bvhs[obj_idx].get_uv(i)
+                self.meshes[obj_idx].get_uv(i)
             },
             RayHittableObjectType::Grid =>
             {
@@ -497,7 +564,7 @@ impl Scene
         }
     }
 
-    pub fn intersect_object(&self, ray: &mut Ray, obj_idx: usize, obj_type: RayHittableObjectType)
+    pub fn intersect_object(&self, ray: &mut Ray, obj_idx: usize, obj_type: RayHittableObjectType, mesh_intersection_setting: &MeshIntersectionSetting)
     {
         let obj_idx = obj_idx as usize;
         let obj_type = obj_type;
@@ -534,7 +601,14 @@ impl Scene
             },
             RayHittableObjectType::Bvh =>
             {
-                self.bvhs[obj_idx].intersect(ray)
+                match mesh_intersection_setting
+                {
+                    MeshIntersectionSetting::Bvh4 => self.bvh_4[obj_idx].intersect(ray),
+                    MeshIntersectionSetting::Bvh128 => self.bvh_128[obj_idx].intersect(ray),
+                    MeshIntersectionSetting::BvhSpatial4 => self.bvh_spatial_4[obj_idx].intersect(ray),
+                    MeshIntersectionSetting::BvhSpatial128 => self.bvh_spatial_128[obj_idx].intersect(ray),
+                    _ => panic!("cannot reach this")
+                }
             },
             RayHittableObjectType::Grid =>
             {

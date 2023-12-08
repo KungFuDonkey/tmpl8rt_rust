@@ -78,8 +78,11 @@ impl Application
         ui.text(ImString::new("Acceleration structure:").deref());
         ui.radio_button(ImString::new("None (not recommended)").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Raw);
         ui.radio_button(ImString::new("Grid").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Grid);
-        ui.radio_button(ImString::new("BVH").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Bvh);
         ui.radio_button(ImString::new("KDTree").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::KDTree);
+        ui.radio_button(ImString::new("BVH4").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Bvh4);
+        ui.radio_button(ImString::new("BVH128").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Bvh128);
+        ui.radio_button(ImString::new("BVHSpatial4").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::BvhSpatial4);
+        ui.radio_button(ImString::new("BVHSpatial128").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::BvhSpatial128);
 
     }
 
