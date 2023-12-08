@@ -7,23 +7,23 @@ pub fn load_obj(path: &std::path::Path, obj_idx: usize, mat_idx: usize, transfor
     let mut options = tobj::LoadOptions::default();
     options.triangulate = true;
 
-    let (models, materials) = tobj::load_obj(path, &options).expect("Failed to load obj file");
+    let (models, _) = tobj::load_obj(path, &options).expect("Failed to load obj file");
 
     let mut meshes: Vec<Mesh> = Vec::new();
-    let mut mats: Vec<Material> = Vec::new();
+    let mats: Vec<Material> = Vec::new();
 
     let mut obj_idx = obj_idx;
-    let mut mat_idx = mat_idx;
+    //let mut mat_idx = mat_idx;
 
-    for (i, m) in models.iter().enumerate()
+    for m in &models
     {
         let mesh = &m.mesh;
         let mat_id = mesh.material_id;
-        let mut matx_id = 0;
+        /*let mut matx_id = 0;
         if mat_id != None
         {
             matx_id = mat_id.unwrap();
-        }
+        }*/
 
         let mut vertices: Vec<Float3> = Vec::with_capacity(mesh.positions.len() / 3);
         let mut triangles: Vec<[usize;3]> = Vec::with_capacity(mesh.indices.len() / 3);
@@ -46,7 +46,8 @@ pub fn load_obj(path: &std::path::Path, obj_idx: usize, mat_idx: usize, transfor
             ])
         }
 
-        meshes.push(Mesh::from_data(obj_idx, 0, *transform, vertices, triangles))
+        meshes.push(Mesh::from_data(obj_idx, 0, *transform, vertices, triangles));
+        obj_idx += 1;
     }
 
 

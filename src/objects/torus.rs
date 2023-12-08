@@ -206,7 +206,7 @@ impl RayHittableObject for Torus
         let origin = transform_position(&ray.origin, &self.inv_t );
         let direction = transform_vector(&ray.direction, &self.inv_t );
         let mut po = 1.0;
-        let mut m = dot(&origin, &origin);
+        let m = dot(&origin, &origin);
         let mut k3 = dot(&origin, &direction);
         let mut k32 = k3 * k3;
 
@@ -222,7 +222,7 @@ impl RayHittableObject for Torus
         }
 
         // setup torus intersection
-        let mut k = (m - rt2 - rc2) * 0.5;
+        let k = (m - rt2 - rc2) * 0.5;
         let mut k2 = k32 + rc2 * direction.z * direction.z + k;
         let mut k1 = k * k3 + rc2 * origin.z * direction.z;
         let mut k0 = k * k + rc2 * origin.z * origin.z - rc2 * rt2;
@@ -245,19 +245,19 @@ impl RayHittableObject for Torus
         c2 *= 0.33333333333;
         c1 *= 2.0;
         c0 *= 0.33333333333;
-        let Q = c2 * c2 + c0;
-        let R = 3.0 * c0 * c2 - c2 * c2 * c2 - c1 * c1;
-        let mut h = R * R - Q * Q * Q;
+        let q = c2 * c2 + c0;
+        let r = 3.0 * c0 * c2 - c2 * c2 * c2 - c1 * c1;
+        let mut h = r * r - q * q * q;
         let mut z: f32;
         if h < 0.0
         {
-            let s_q = Q.sqrt();
-            z = 2.0 * s_q * ((R / (s_q * Q)).acos() * 0.33333333333).cos();
+            let s_q = q.sqrt();
+            z = 2.0 * s_q * ((r / (s_q * q)).acos() * 0.33333333333).cos();
         }
         else
         {
-            let s_q = Torus::cbrt_fast_f32(h.sqrt() + R.abs());
-            z = ( s_q + Q / s_q).abs().copysign(R);
+            let s_q = Torus::cbrt_fast_f32(h.sqrt() + r.abs());
+            z = ( s_q + q / s_q).abs().copysign(r);
         }
         z = c2 - z;
         let mut d1 = z - 3.0 * c2;
@@ -279,7 +279,7 @@ impl RayHittableObject for Torus
             d1 = ( d1 * 0.5 ).sqrt();
             d2 = c1 / d1;
         }
-        let t = 1e20;
+
         h = d1 * d1 - z + d2;
         if h > 0.0
         {

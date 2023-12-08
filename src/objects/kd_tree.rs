@@ -1,9 +1,7 @@
-use std::collections::HashSet;
 use crate::math::*;
 use crate::objects::aabb::*;
 use crate::objects::triangle::*;
 use crate::objects::mesh::*;
-use rayon::prelude::*;
 use crate::ray::{Ray, RayHittableObject, RayHittableObjectType};
 
 struct KDTriangle
@@ -29,8 +27,8 @@ impl KDNode
 
 pub struct KDTree
 {
-    pub triangles: Vec<KDTriangle>,
-    pub kd_nodes: Vec<KDNode>,
+    triangles: Vec<KDTriangle>,
+    kd_nodes: Vec<KDNode>,
     pub triangle_ids: Vec<usize>,
     pub t: Mat4,
     pub inv_t: Mat4,
@@ -49,7 +47,7 @@ impl KDTree
     {
         let triangle_count = mesh.triangles.len();
         let mut triangles: Vec<KDTriangle> = Vec::with_capacity(triangle_count);
-        let mut triangle_ids: Vec<usize> = Vec::with_capacity(triangle_count * 2);
+        let triangle_ids: Vec<usize> = Vec::with_capacity(triangle_count * 2);
 
         let mut start_triangle_ids: Vec<usize> = Vec::with_capacity(triangle_count);
 

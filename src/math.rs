@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use std::cmp::max;
 use std::ops::*;
 
 pub const EPSILON: f32 = 0.00005;

@@ -48,7 +48,7 @@ impl Scene
 {
     pub fn new() -> Self
     {
-        let materials = vec![
+        let mut materials = vec![
             linear_color(Float3::from_a(1.0)),
             linear_color(Float3::from_a(0.93)),
             checkerboard_material(),
@@ -68,9 +68,8 @@ impl Scene
         torus.t = Mat4::translate(&translation) * Mat4::rotate_x(PI / 4.0);
         torus.inv_t = torus.t.inverted();
 
-        let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 2.5)) * Mat4::scale(0.5);
-
         let mut meshes: Vec<Mesh> = Vec::new();
+        //let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 2.5)) * Mat4::scale(0.5);
         //meshes.push(Mesh::triangle(0, 6, transform));
 
         //let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 1.0)) * Mat4::scale(0.5);
@@ -82,6 +81,11 @@ impl Scene
         for mesh in msh
         {
             meshes.push(mesh);
+        }
+
+        for material in mts
+        {
+            materials.push(material);
         }
 
         let mut scene = Scene{
@@ -342,7 +346,7 @@ impl Scene
         let sample_strength = 1.0 / (total_sample_points as f32);
         let mut lighting = Float3::zero();
 
-        for i in 0..sample_size
+        for _ in 0..sample_size
         {
             let quad_index = random_uint_s(seed) % (self.quads.len() as u32);
             let quad = &self.quads[quad_index as usize];
@@ -367,7 +371,7 @@ impl Scene
 
     pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3, mesh_setting: &MeshIntersectionSetting) -> Float3
     {
-        let total_sample_points = (self.quads.len() as u32);
+        let total_sample_points = self.quads.len() as u32;
         let light_strength = 1.0 / (total_sample_points as f32);
         let mut lighting = Float3::zero();
         for quad in &self.quads

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::math::*;
 use crate::objects::triangle::Triangle;
 use crate::ray::*;

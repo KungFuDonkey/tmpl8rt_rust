@@ -1,5 +1,5 @@
 use crate::math::*;
-use crate::objects::aabb::{AABB, intersect_aabb, intersect_aabb_triangle, triangle_is_in_aabb};
+use crate::objects::aabb::{AABB, intersect_aabb};
 use crate::objects::triangle::{intersect_triangle, Triangle};
 use crate::objects::mesh::Mesh;
 use crate::ray::*;
@@ -14,7 +14,7 @@ struct GridTriangle
 pub struct Grid
 {
     pub bounds: AABB,
-    pub triangles: Vec<GridTriangle>,
+    triangles: Vec<GridTriangle>,
     pub grid: Vec<Vec<usize>>,
     pub t: Mat4,
     pub inv_t: Mat4,
@@ -171,6 +171,7 @@ impl Grid
         return intersected;
     }
 
+    #[allow(dead_code)]
     fn get_cell_aabb(&self, x: usize, y: usize, z: usize) -> AABB
     {
         let cell_index = Float3::from_xyz(x as f32, y as f32, z as f32);
@@ -272,8 +273,6 @@ impl RayHittableObject for Grid
 
         let start_position = ray_t.origin + ray_t.direction * (t + 0.0001);
 
-        let ray_orig_grid = ray_t.origin - self.bounds.min_bound;
-
         let mut delta_t = Float3::zero();
 
         let mut x: usize = 0;
@@ -318,7 +317,7 @@ impl RayHittableObject for Grid
         let mut t_y = t + delta_t.y;
         let mut t_z = t + delta_t.z;
 
-        let mut t: f32 = 0.0;
+        let mut t: f32;
 
         let mut intersected= false;
 

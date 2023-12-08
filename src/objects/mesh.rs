@@ -1,5 +1,4 @@
 use crate::math::*;
-use crate::objects::triangle::{intersect_triangle, Triangle};
 use crate::ray::*;
 use crate::objects::aabb::{AABB, intersect_aabb};
 
@@ -17,6 +16,7 @@ pub struct Mesh
 
 impl Mesh
 {
+    #[allow(dead_code)]
     pub fn from_tri_file(obj_idx: usize, mat_idx: usize, transform: Mat4, path: &std::path::Path) -> Self
     {
         let mut vertices = Vec::new();

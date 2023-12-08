@@ -52,7 +52,7 @@ impl Renderer
     pub fn new() -> Renderer
     {
         let seed_base: u32 = 0x123456;
-        let mut seed = init_seed(seed_base);
+        let seed = init_seed(seed_base);
 
         let render_mode = RenderMode::Complexity;
 

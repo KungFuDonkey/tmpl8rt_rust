@@ -48,9 +48,9 @@ impl Clipped
         {
             let mut ntmp = 0;
             let mut tmp = [Float3::zero(); 9];
-            let mut C = Float3::zero();
+            let mut c: Float3;
             let mut v0 = v[vertices - 1];
-            let mut v1 = Float3::zero();
+            let mut v1: Float3;
             let mut plane = bounding_box.minimal(a);
             let mut x = (v0.get_axis(a) - plane) >= 0.0;
             for i in 0..vertices
@@ -67,9 +67,9 @@ impl Clipped
                 else if !x && d1 > 0.0
                 {
                     // coming in: emit C and d1
-                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
-                    C.set_axis(a, plane);
-                    tmp[ntmp] = C;
+                    c = v0 + (d0 / (d0 - d1)) * (v1 - v0);
+                    c.set_axis(a, plane);
+                    tmp[ntmp] = c;
                     ntmp += 1;
                     tmp[ntmp] = v1;
                     ntmp += 1;
@@ -77,9 +77,9 @@ impl Clipped
                 }
                 else if x && d1 < 0.0 // going out: emit C
                 {
-                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
-                    C.set_axis(a, plane);
-                    tmp[ntmp] = C;
+                    c = v0 + (d0 / (d0 - d1)) * (v1 - v0);
+                    c.set_axis(a, plane);
+                    tmp[ntmp] = c;
                     ntmp += 1;
                     x = false;
                 }
@@ -108,9 +108,9 @@ impl Clipped
                 else if !x && d1 > 0.0
                 {
                     // coming in: emit C and d1
-                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
-                    C.set_axis(a,plane);
-                    v[vertices] = C;
+                    c = v0 + (d0 / (d0 - d1)) * (v1 - v0);
+                    c.set_axis(a, plane);
+                    v[vertices] = c;
                     vertices += 1;
                     v[vertices] = v1;
                     vertices += 1;
@@ -119,9 +119,9 @@ impl Clipped
                 else if x && d1 < 0.0
                 {
                     // going out: emit C
-                    C = v0 + (d0 / (d0 - d1)) * (v1 - v0);
-                    C.set_axis(a,plane);
-                    v[vertices] = C;
+                    c = v0 + (d0 / (d0 - d1)) * (v1 - v0);
+                    c.set_axis(a, plane);
+                    v[vertices] = c;
                     vertices += 1;
                     x = false;
                 }
@@ -152,8 +152,8 @@ impl Clipped
 
 pub struct BVH
 {
-    pub triangles: Vec<BVHTriangle>,
-    pub bvh_nodes: Vec<BVHNode>,
+    triangles: Vec<BVHTriangle>,
+    bvh_nodes: Vec<BVHNode>,
     pub triangle_idx: Vec<usize>,
     pub triangle_tmp: Vec<usize>,
     pub root_node_idx: usize,
@@ -208,7 +208,7 @@ impl BVH
             triangle.bounds.grow(&triangle.internal_triangle.vertex2);
         });
 
-        let mut root = BVHNode {
+        let root = BVHNode {
             left_first: 0,
             tri_count: prim_count,
             bounds: mesh.bounds
@@ -299,7 +299,7 @@ impl BVH
                 triangle.bounds.grow(&triangle.internal_triangle.vertex2);
             });
 
-        let mut root = BVHNode {
+        let root = BVHNode {
             left_first: 0,
             tri_count: prim_count,
             bounds: mesh.bounds
@@ -410,7 +410,7 @@ impl BVH
         cost += self.sah_cost(node.left_first);
         cost += self.sah_cost(node.left_first + 1);
         cost += area;
-        if (node_idx == 0)
+        if node_idx == 0
         {
             cost *= 1.0 / area;
         }
@@ -590,7 +590,7 @@ impl BVH
         let mut spatial_split_pos: f32 = 0.0;
         let no_split_cost: f32 = BVH::calculate_node_cost(&node);
 
-        let mut obj_split_cost = self.find_best_object_split_plane(&node, &mut obj_split_axis, &mut obj_split_pos, &mut left_box, &mut right_box);
+        let obj_split_cost = self.find_best_object_split_plane(&node, &mut obj_split_axis, &mut obj_split_pos, &mut left_box, &mut right_box);
 
         if self.is_spatial
         {
@@ -746,7 +746,7 @@ impl BVH
         {
             let lb = i;
             let ub = i + (node.tri_count - left_count);
-            self.triangle_idx.copy_within((lb..ub), i + half_slack);
+            self.triangle_idx.copy_within(lb..ub, i + half_slack);
         }
 
         let left_child_idx = self.nodes_used;

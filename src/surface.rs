@@ -1,5 +1,4 @@
 use image::GenericImageView;
-use crate::math::Float3;
 
 pub const SCRWIDTH: usize = 1024;
 pub const SCRHEIGHT: usize = 640;
@@ -34,6 +33,7 @@ impl Surface
         return Surface { pixels }
     }
 
+    #[allow(dead_code)]
     pub fn invert(other: &Surface) -> Self
     {
         let mut pixels = Vec::with_capacity(other.pixels.capacity());

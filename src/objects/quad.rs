@@ -34,6 +34,7 @@ impl Quad
         return corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1);
     }
 
+    #[allow(dead_code)]
     pub fn random_points(&self, num: usize, seed: &mut u32) -> Vec<Float3>
     {
         let mut vector: Vec<Float3> = Vec::with_capacity(num);

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::material::UVMaterial::{CheckerboardMaterial, LogoMaterial, JaccoMaterial};
 use crate::math::{Float2, Float3};
 use crate::surface::Surface;

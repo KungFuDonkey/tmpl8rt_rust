@@ -28,6 +28,7 @@ impl Camera
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_aspect_ratio(&mut self, aspect: f32)
     {
         self.aspect_ratio = aspect;
