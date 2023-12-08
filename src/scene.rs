@@ -126,6 +126,8 @@ impl Scene
 
         scene.construct_acceleration_structures();
 
+        scene.set_time(0.0);
+
         return scene;
     }
 

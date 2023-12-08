@@ -26,7 +26,7 @@ impl Application
             renderer: Renderer::new(),
             camera: Camera::new(),
             scene: Scene::new(),
-            animating: true,
+            animating: false,
             animation_time: 0.0,
             internal_timer: FrameTimer::new()
         }
@@ -58,7 +58,6 @@ impl Application
 
     pub fn ui(&mut self, ui: &mut Ui)
     {
-        ui.checkbox(ImString::new("Animate scene").deref(), &mut self.animating);
         ui.text(ImString::new("Render mode:").deref());
         ui.radio_button(ImString::new("Ray tracing").deref(), &mut self.renderer.render_mode, RenderMode::Standard);
         ui.radio_button(ImString::new("Normals").deref(), &mut self.renderer.render_mode, RenderMode::Normals);
@@ -66,16 +65,7 @@ impl Application
         ui.radio_button(ImString::new("Complexity").deref(), &mut self.renderer.render_mode, RenderMode::Complexity);
         ui.radio_button(ImString::new("Complexity - Relative").deref(), &mut self.renderer.render_mode, RenderMode::RelativeComplexity);
 
-        ui.text(ImString::new("Raytracing Settings:").deref());
-        ui.slider_int(ImString::new("Bounces").deref(), &mut self.renderer.render_settings.max_bounces, 0, 8 ).build();
-
-        ui.text(ImString::new("Shadows:").deref());
-        ui.radio_button(ImString::new("No shadows").deref(), &mut self.renderer.render_settings.lighting_mode, LightingMode::None);
-        ui.radio_button(ImString::new("Ray tracing + Hard Shadows").deref(), &mut self.renderer.render_settings.lighting_mode, LightingMode::HardShadows);
-        ui.radio_button(ImString::new("Ray tracing + Soft Shadows").deref(), &mut self.renderer.render_settings.lighting_mode, LightingMode::SoftShadows);
-
-        ui.slider_int(ImString::new("Light sample size").deref(), &mut self.renderer.render_settings.area_sample_size, 1, 8 ).build();
-
+        ui.text(ImString::new("").deref());
         ui.text(ImString::new("Acceleration structure:").deref());
         ui.radio_button(ImString::new("None (not recommended)").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Raw);
         ui.radio_button(ImString::new("Grid").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Grid);
@@ -84,6 +74,23 @@ impl Application
         ui.radio_button(ImString::new("BVH128").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Bvh128);
         ui.radio_button(ImString::new("BVHSpatial4").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::BvhSpatial4);
         ui.radio_button(ImString::new("BVHSpatial128").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::BvhSpatial128);
+
+        ui.text(ImString::new("").deref());
+        ui.text(ImString::new("Scene settings:").deref());
+        ui.checkbox(ImString::new("Animate scene").deref(), &mut self.animating);
+
+        ui.text(ImString::new("").deref());
+        ui.text(ImString::new("Raytracing Settings:").deref());
+        ui.slider_int(ImString::new("Bounces").deref(), &mut self.renderer.render_settings.max_bounces, 0, 8 ).build();
+
+        ui.text(ImString::new("").deref());
+        ui.text(ImString::new("Shadows:").deref());
+        ui.radio_button(ImString::new("No shadows").deref(), &mut self.renderer.render_settings.lighting_mode, LightingMode::None);
+        ui.radio_button(ImString::new("Ray tracing + Hard Shadows").deref(), &mut self.renderer.render_settings.lighting_mode, LightingMode::HardShadows);
+        ui.radio_button(ImString::new("Ray tracing + Soft Shadows").deref(), &mut self.renderer.render_settings.lighting_mode, LightingMode::SoftShadows);
+
+        ui.text(ImString::new("").deref());
+        ui.slider_int(ImString::new("Light sample size").deref(), &mut self.renderer.render_settings.area_sample_size, 1, 8 ).build();
 
     }
 
