@@ -60,7 +60,7 @@ impl Scene
             linear_color(Float3::from_xyz(0.0, 0.0, 1.0)),
             reflective_material(linear_color_simple(Float3::from_a(1.0)), 0.02),
             fully_reflective_material(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0))),
-            refractive_material_with_exit(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0)), 1.5, 10.0),
+            reflective_material(linear_color_simple(Float3::from_xyz(1.0, 0.0, 0.0)), 0.8),
         ];
 
         let mut torus = Torus::new(0, 0, 0.8, 0.25);
@@ -402,8 +402,7 @@ impl Scene
         let obj_idx = ray.obj_idx;
         if obj_idx == usize::MAX
         {
-            println!("ERROR: obj_idx not set or no object was hit in get_normal()");
-            return Float3::zero();
+            panic!("ERROR: obj_idx not set or no object was hit in get_normal()");
         }
 
         let obj_idx = obj_idx as usize;
@@ -413,8 +412,7 @@ impl Scene
         {
             RayHittableObjectType::None =>
             {
-                println!("ERROR: tried to get normal of non object");
-                Float3::zero()
+                panic!("ERROR: tried to get normal of non object");
             },
             RayHittableObjectType::Sphere =>
             {
