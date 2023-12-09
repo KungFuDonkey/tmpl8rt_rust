@@ -152,6 +152,7 @@ impl Renderer
             }
             Material::RefractiveMaterialWithExit(refractive_material, n2, absorption) =>
             {
+                // currently broken
                 // assumes no collisions with any other objects, so a full glass ball with no objects inside
 
                 let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
@@ -165,7 +166,11 @@ impl Renderer
 
                 if k < 0.0
                 {
-                    // do reflection
+                    let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
+                    let reflected_ray_direction = reflect(&ray.direction, &normal);
+                    let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
+                    let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, refractive_material);
+                    return (material_color) * Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
                 }
 
                 let refract_direction = (n1n2 * ray.direction) + (normal * (n1n2 * theta1_2 - k.sqrt()));
@@ -174,6 +179,11 @@ impl Renderer
 
                 // only do self intersection
                 scene.intersect_object(&mut refract_ray, ray.obj_idx as usize, ray.obj_type, &render_settings.mesh_intersection_setting);
+                if refract_ray.obj_idx == usize::MAX
+                {
+                    println!("no int");
+                    return Float3::zero();
+                }
                 let refract_normal = scene.get_normal(&refract_ray, &intersection, &refract_direction, &render_settings.mesh_intersection_setting);
                 let reversed_refract_dir = -refract_direction;
                 let theta1 = dot (&refract_normal, &reversed_refract_dir);
