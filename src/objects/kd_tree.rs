@@ -228,6 +228,11 @@ impl KDTree
 
     fn intersect_kd_node(&self, ray: &mut Ray, current_t: f32, node_id: usize, depth: u32, bounds: &AABB) -> bool
     {
+        if current_t >= ray.t
+        {
+            return false;
+        }
+
         ray.intersection_tests += 1;
 
         let current_node = &self.kd_nodes[node_id];

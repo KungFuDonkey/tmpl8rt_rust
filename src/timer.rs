@@ -51,7 +51,7 @@ impl FrameTimer
         self.internal_timer.reset();
     }
 
-    pub fn print_frame_time(&mut self)
+    pub fn get_frame_time(&mut self) -> (f32, f32, f32)
     {
         self.avg = (1.0 - self.alpha) * self.avg + self.alpha * (self.internal_timer.elapsed() as f32);
         if self.alpha > 0.05
@@ -60,6 +60,12 @@ impl FrameTimer
         }
         let fps = 1000.0 / self.avg;
         let rps = ((SCRWIDTH * SCRHEIGHT) as f32) / self.avg;
-        println!("{}ms ({}fps) - ({} rays/s)", self.avg, fps, rps / 1000.0);
+        return (self.avg, fps, rps);
+    }
+
+    pub fn print_frame_time(&mut self)
+    {
+        let (ms, fps, rps) = self.get_frame_time();
+        println!("{}ms ({}fps) - ({} rays/s)", ms, fps, rps);
     }
 }

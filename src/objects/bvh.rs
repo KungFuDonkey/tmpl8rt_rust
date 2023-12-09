@@ -517,8 +517,8 @@ impl BVH
                 let mut left_box = AABB::from_bounds(&node.bounds.min_bound, &node.bounds.max_bound);
                 let mut right_box = AABB::from_bounds(&node.bounds.min_bound, &node.bounds.max_bound);
 
-                left_box.max_bound.set_axis(a, pos);
-                right_box.min_bound.set_axis(a, pos);
+                left_box.max_bound.set_axis(a, pos - EPSILON);
+                right_box.min_bound.set_axis(a, pos + EPSILON);
 
                 let mut left_count: usize = 0;
                 let mut right_count: usize = 0;
@@ -614,8 +614,8 @@ impl BVH
                     }
                     let mut left_of_split = node.bounds.clone();
                     let mut right_of_split = node.bounds.clone();
-                    left_of_split.max_bound.set_axis(spatial_split_axis, spatial_split_pos);
-                    right_of_split.min_bound.set_axis(spatial_split_axis, spatial_split_pos);
+                    left_of_split.max_bound.set_axis(spatial_split_axis, spatial_split_pos + EPSILON);
+                    right_of_split.min_bound.set_axis(spatial_split_axis, spatial_split_pos - EPSILON);
 
                     let mut left_pos = node.left_first;
                     let mut left_count: usize = 0;

@@ -19,7 +19,10 @@ pub struct Application
     internal_timer: FrameTimer,
     manual_frames_to_render: i32,
     manual_redraw_screen: bool,
-    static_frame_timer: Timer
+    static_frame_timer: Timer,
+    ms: f32,
+    fps: f32,
+    rps: f32
 }
 
 impl Application
@@ -36,7 +39,10 @@ impl Application
             internal_timer: FrameTimer::new(),
             static_frame_timer: Timer::new(),
             manual_frames_to_render: 0,
-            manual_redraw_screen: false
+            manual_redraw_screen: false,
+            ms: 0.0,
+            fps: 0.0,
+            rps: 0.0
         }
     }
 
@@ -55,7 +61,7 @@ impl Application
 
         self.internal_timer.reset();
         self.renderer.render(&self.scene, &self.camera);
-        self.internal_timer.print_frame_time();
+        (self.ms, self.fps, self.rps) = self.internal_timer.get_frame_time();
 
         if self.manual_frames_to_render > 0
         {
@@ -108,6 +114,18 @@ impl Application
 
     pub fn ui(&mut self, ui: &mut Ui)
     {
+        if self.is_rendering
+        {
+            let render_string = format!("ms : {}\nfps: {}\nrps: {}\n", self.ms, self.fps, self.rps);
+
+            ui.text(ImString::new(render_string).deref());
+        }
+        else
+        {
+            ui.text(ImString::new("paused").deref());
+        }
+
+
         ui.text(ImString::new("Render mode:").deref());
         ui.radio_button(ImString::new("Ray tracing").deref(), &mut self.renderer.render_mode, RenderMode::Standard);
         ui.radio_button(ImString::new("Normals").deref(), &mut self.renderer.render_mode, RenderMode::Normals);
