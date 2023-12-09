@@ -12,6 +12,7 @@ mod material;
 mod ray;
 mod objects;
 mod obj_loader;
+mod bitvec;
 
 use surface::*;
 use crate::opengl::{draw_quad, GLTexture, Shader, TextureType};

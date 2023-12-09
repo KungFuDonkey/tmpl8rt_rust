@@ -1,3 +1,4 @@
+use crate::bitvec::BitVector;
 use crate::math::*;
 use crate::ray::*;
 use crate::objects::mesh::*;
@@ -606,6 +607,9 @@ impl BVH
 
                 let mut spatial_split_cost = self.find_best_spatial_split_plane(&node, &mut spatial_split_axis, &mut spatial_split_pos, &mut n_left, &mut n_right, &mut bounds_left, &mut bounds_right, &mut splitted);
 
+                let mut n_left: i32 = n_left as i32;
+                let mut n_right: i32 = n_right as i32;
+
                 if spatial_split_cost < obj_split_cost && splitted < (slack as i32)
                 {
                     if spatial_split_cost >= no_split_cost
@@ -778,6 +782,7 @@ impl RayHittableObject for BVH
         ray_t.obj_idx = ray.obj_idx;
         ray_t.obj_type = ray.obj_type;
 
+        let mut mailbox = BitVector::new(self.triangles.len());
         let mut node = &self.bvh_nodes[self.root_node_idx];
         let mut stack = [BVHNode{
             bounds: AABB::from_empty(),
@@ -794,7 +799,13 @@ impl RayHittableObject for BVH
             {
                 for i in 0..node.tri_count
                 {
-                    intersected = intersect_triangle(&self.triangles[self.triangle_idx[node.left_first + i]].internal_triangle, &mut ray_t) || intersected
+                    let id = self.triangle_idx[node.left_first + i];
+                    if mailbox.get_unchecked(id)
+                    {
+                        continue;
+                    }
+                    mailbox.set_true(id);
+                    intersected = intersect_triangle(&self.triangles[id].internal_triangle, &mut ray_t) || intersected
                 }
 
                 if stack_ptr == 0

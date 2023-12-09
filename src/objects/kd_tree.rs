@@ -1,3 +1,4 @@
+use crate::bitvec::BitVector;
 use crate::math::*;
 use crate::objects::aabb::*;
 use crate::objects::triangle::*;
@@ -226,7 +227,7 @@ impl KDTree
         return (left_triangles, right_triangles)
     }
 
-    fn intersect_kd_node(&self, ray: &mut Ray, current_t: f32, node_id: usize, depth: u32, bounds: &AABB) -> bool
+    fn intersect_kd_node(&self, ray: &mut Ray, current_t: f32, node_id: usize, depth: u32, bounds: &AABB, mailbox: &mut BitVector) -> bool
     {
         if current_t >= ray.t
         {
@@ -247,7 +248,12 @@ impl KDTree
             let mut intersected = false;
             for i in &self.triangle_ids[current_node.left_first..(current_node.left_first + current_node.triangle_count)]
             {
-                let triangle = &self.triangles[*i].internal_triangle;
+                let id = *i;
+                if mailbox.get_unchecked(id)
+                {
+                    continue;
+                }
+                let triangle = &self.triangles[id].internal_triangle;
                 intersected = intersect_triangle(triangle, ray) || intersected;
             }
 
@@ -287,11 +293,11 @@ impl KDTree
             {
                 let mut left_bounds = *bounds;
                 left_bounds.max_bound.set_axis(axis, current_node.plane_value + EPSILON);
-                return self.intersect_kd_node(ray, current_t, current_node.left_first, depth + 1, &left_bounds);
+                return self.intersect_kd_node(ray, current_t, current_node.left_first, depth + 1, &left_bounds, mailbox);
             }
             let mut right_bounds = *bounds;
             right_bounds.min_bound.set_axis(axis, current_node.plane_value - EPSILON);
-            return self.intersect_kd_node(ray, current_t, current_node.left_first + 1, depth + 1, &right_bounds);
+            return self.intersect_kd_node(ray, current_t, current_node.left_first + 1, depth + 1, &right_bounds, mailbox);
         }
 
         let t = current_t + t;
@@ -303,23 +309,23 @@ impl KDTree
 
         if left_ordering
         {
-            let intersection = self.intersect_kd_node(ray, current_t, current_node.left_first, depth + 1, &left_bounds);
+            let intersection = self.intersect_kd_node(ray, current_t, current_node.left_first, depth + 1, &left_bounds, mailbox);
 
             if intersection && ray.t < t
             {
                 return true;
             }
 
-            return self.intersect_kd_node(ray, t, current_node.left_first + 1, depth + 1, &right_bounds) || intersection;
+            return self.intersect_kd_node(ray, t, current_node.left_first + 1, depth + 1, &right_bounds, mailbox) || intersection;
         }
 
-        let intersection = self.intersect_kd_node(ray, current_t, current_node.left_first + 1, depth + 1, &right_bounds);
+        let intersection = self.intersect_kd_node(ray, current_t, current_node.left_first + 1, depth + 1, &right_bounds, mailbox);
 
         if intersection && ray.t < t
         {
             return true;
         }
-        return self.intersect_kd_node(ray, t, current_node.left_first, depth + 1, &left_bounds) || intersection;
+        return self.intersect_kd_node(ray, t, current_node.left_first, depth + 1, &left_bounds, mailbox) || intersection;
     }
 }
 
@@ -339,10 +345,11 @@ impl RayHittableObject for KDTree
             return;
         }
 
+        let mut mailbox = BitVector::new(self.triangles.len());
         let mut bounds = self.bounds;
         bounds.max_bound += EPSILON_VECTOR;
         bounds.min_bound -= EPSILON_VECTOR;
-        if self.intersect_kd_node(&mut ray_t, t,0, 0, &bounds)
+        if self.intersect_kd_node(&mut ray_t, t,0, 0, &bounds, &mut mailbox)
         {
             ray.t = ray_t.t;
             ray.obj_type = RayHittableObjectType::KDTree;

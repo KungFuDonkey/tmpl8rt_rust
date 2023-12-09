@@ -30,7 +30,7 @@ pub struct RenderSettings
     pub lighting_mode: LightingMode,
     pub area_sample_size: i32,
     pub mesh_intersection_setting: MeshIntersectionSetting,
-    pub max_expected_intersection_tests: u32,
+    pub max_expected_intersection_tests: i32,
 }
 
 

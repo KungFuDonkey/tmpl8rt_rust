@@ -1,3 +1,4 @@
+use crate::bitvec::BitVector;
 use crate::math::*;
 use crate::objects::aabb::{AABB, intersect_aabb};
 use crate::objects::triangle::{intersect_triangle, Triangle};
@@ -161,12 +162,18 @@ impl Grid
     }
 
     #[inline(always)]
-    fn intersect_triangles_in_cell(&self, ray: &mut Ray, x: usize, y: usize, z: usize) -> bool
+    fn intersect_triangles_in_cell(&self, ray: &mut Ray, x: usize, y: usize, z: usize, mailbox: &mut BitVector) -> bool
     {
         let mut intersected = false;
         for triangle in &self.grid[x + y * self.res_x + z * self.res_x * self.res_y]
         {
-            intersected = intersect_triangle(&self.triangles[*triangle].internal_triangle, ray) || intersected;
+            let id = *triangle;
+            if mailbox.get_unchecked(id)
+            {
+                continue;
+            }
+            mailbox.set_true(id);
+            intersected = intersect_triangle(&self.triangles[id].internal_triangle, ray) || intersected;
         }
         return intersected;
     }
@@ -271,6 +278,8 @@ impl RayHittableObject for Grid
         }
         return;*/
 
+        let mut mailbox = BitVector::new(self.triangles.len());
+
         let start_position = ray_t.origin + ray_t.direction * (t + 0.0001);
 
         let mut delta_t = Float3::zero();
@@ -323,7 +332,7 @@ impl RayHittableObject for Grid
 
         loop
         {
-            if self.intersect_triangles_in_cell(&mut ray_t, x as usize, y as usize, z as usize)
+            if self.intersect_triangles_in_cell(&mut ray_t, x as usize, y as usize, z as usize, &mut mailbox)
             {
                 intersected = true;
             }

@@ -133,6 +133,8 @@ impl Application
         ui.radio_button(ImString::new("Complexity").deref(), &mut self.renderer.render_mode, RenderMode::Complexity);
         ui.radio_button(ImString::new("Complexity - Relative").deref(), &mut self.renderer.render_mode, RenderMode::RelativeComplexity);
 
+        ui.slider_int(ImString::new("Max intersection Tests").deref(), &mut self.renderer.render_settings.max_expected_intersection_tests, 100, 1000 ).build();
+
         ui.text(ImString::new("").deref());
         ui.text(ImString::new("Acceleration structure:").deref());
         ui.radio_button(ImString::new("None (not recommended)").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Raw);
