@@ -17,20 +17,15 @@ pub struct Grid
     pub bounds: AABB,
     triangles: Vec<GridTriangle>,
     pub grid: Vec<Vec<usize>>,
-    pub t: Mat4,
-    pub inv_t: Mat4,
-    pub normals: Vec<Float3>,
     pub res_x: usize,
     pub res_y: usize,
     pub res_z: usize,
     pub cell_size: Float3,
-    pub obj_idx: usize,
-    pub mat_idx: usize
 }
 
 impl Grid
 {
-    pub fn from_mesh(mesh: &Mesh, res_x: usize, res_y: usize, res_z: usize) -> Grid
+    pub fn from_mesh(triangles: &Vec<[usize; 3]>, vertices: &Vec<Float3>, bounds: &AABB, res_x: usize, res_y: usize, res_z: usize) -> Grid
     {
         let mut grid = Vec::with_capacity((res_x * res_y * res_z) as usize);
         for i in 0..(res_x * res_y * res_z)
@@ -38,16 +33,16 @@ impl Grid
             grid.push(Vec::with_capacity(0));
         }
 
-        let mut triangles: Vec<GridTriangle> = Vec::with_capacity(mesh.triangles.len());
+        let mut grid_triangles: Vec<GridTriangle> = Vec::with_capacity(triangles.len());
 
         let mut tri_idx = 0;
-        for triangle in &mesh.triangles
+        for triangle in triangles
         {
-            let vertex0 = mesh.vertices[triangle[0]];
-            let vertex1 = mesh.vertices[triangle[1]];
-            let vertex2 = mesh.vertices[triangle[2]];
+            let vertex0 = vertices[triangle[0]];
+            let vertex1 = vertices[triangle[1]];
+            let vertex2 = vertices[triangle[2]];
 
-            triangles.push(GridTriangle
+            grid_triangles.push(GridTriangle
             {
                 internal_triangle: Triangle {
                     vertex0,
@@ -59,7 +54,7 @@ impl Grid
             tri_idx += 1;
         }
 
-        let bounds = mesh.bounds;
+        let bounds = *bounds;
 
         let cell_size = Float3::from_xyz(
             (bounds.max_bound.x - bounds.min_bound.x) / (res_x as f32),
@@ -70,13 +65,8 @@ impl Grid
         let mut grid = Grid
         {
             bounds,
-            triangles,
+            triangles: grid_triangles,
             grid,
-            t: mesh.t,
-            inv_t: mesh.inv_t,
-            normals: mesh.triangle_normals.to_vec(),
-            obj_idx: mesh.obj_idx,
-            mat_idx: mesh.mat_idx,
             res_x,
             res_y,
             res_z,
@@ -210,24 +200,8 @@ impl Grid
             *z = self.res_z - 1;
         }
     }
-}
 
-impl RayHittableObject for Grid
-{
-    fn intersect(&self, ray: &mut Ray) {
-        let origin = transform_position(&ray.origin, &self.inv_t );
-        let direction = transform_vector(&ray.direction, &self.inv_t );
-
-        let mut ray_t = Ray::directed_distance(origin, direction, ray.t);
-        ray_t.obj_idx = ray.obj_idx;
-        ray_t.obj_type = ray.obj_type;
-
-        // check for intersection with boundary of grid
-        let t = intersect_aabb(&mut ray_t, &self.bounds);
-        if t == 1e30
-        {
-            return;
-        }
+    pub fn intersect(&self, ray_t: &mut Ray, t: f32) -> bool {
 
         // draws bounding box
         /*ray.t = ray_t.t;
@@ -332,7 +306,7 @@ impl RayHittableObject for Grid
 
         loop
         {
-            if self.intersect_triangles_in_cell(&mut ray_t, x as usize, y as usize, z as usize, &mut mailbox)
+            if self.intersect_triangles_in_cell(ray_t, x as usize, y as usize, z as usize, &mut mailbox)
             {
                 intersected = true;
             }
@@ -374,31 +348,6 @@ impl RayHittableObject for Grid
             }
         }
 
-        ray.intersection_tests += ray_t.intersection_tests;
-
-        if intersected
-        {
-            ray.t = ray_t.t;
-            ray.obj_idx = self.obj_idx;
-            ray.obj_type = RayHittableObjectType::Grid;
-            ray.sub_obj_idx = ray_t.sub_obj_idx;
-        }
-
-    }
-
-    fn get_normal(&self, ray: &Ray, i: &Float3) -> Float3 {
-        return self.normals[ray.sub_obj_idx];
-    }
-
-    fn get_uv(&self, i: &Float3) -> Float2 {
-        return Float2::zero();
-    }
-
-    fn is_occluded(&self, ray: &Ray) -> bool {
-        let mut shadow = ray.clone();
-        shadow.t = 1e34;
-        shadow.obj_idx = usize::MAX;
-        self.intersect(&mut shadow);
-        return shadow.obj_idx != usize::MAX;
+        return intersected;
     }
 }

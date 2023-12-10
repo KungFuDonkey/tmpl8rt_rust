@@ -31,35 +31,29 @@ pub struct KDTree
     triangles: Vec<KDTriangle>,
     kd_nodes: Vec<KDNode>,
     pub triangle_ids: Vec<usize>,
-    pub t: Mat4,
-    pub inv_t: Mat4,
-    pub normals: Vec<Float3>,
-    pub obj_idx: usize,
-    pub mat_idx: usize,
     pub max_depth: u32,
     pub max_triangles_in_leaf: usize,
-    pub scan_samples: u32,
-    pub bounds: AABB
+    pub scan_samples: u32
 }
 
 impl KDTree
 {
-    pub fn from_mesh(mesh: &Mesh, max_depth: u32, max_triangles_in_leaf: usize, scan_samples: u32) -> KDTree
+    pub fn from_mesh(triangles: &Vec<[usize; 3]>, vertices: &Vec<Float3>, bounds: &AABB, max_depth: u32, max_triangles_in_leaf: usize, scan_samples: u32) -> KDTree
     {
-        let triangle_count = mesh.triangles.len();
-        let mut triangles: Vec<KDTriangle> = Vec::with_capacity(triangle_count);
+        let triangle_count = triangles.len();
+        let mut kd_tree_triangles: Vec<KDTriangle> = Vec::with_capacity(triangle_count);
         let triangle_ids: Vec<usize> = Vec::with_capacity(triangle_count * 2);
 
         let mut start_triangle_ids: Vec<usize> = Vec::with_capacity(triangle_count);
 
         let mut tri_idx = 0;
-        for triangle in &mesh.triangles
+        for triangle in triangles
         {
-            let vertex0 = mesh.vertices[triangle[0]];
-            let vertex1 = mesh.vertices[triangle[1]];
-            let vertex2 = mesh.vertices[triangle[2]];
+            let vertex0 = vertices[triangle[0]];
+            let vertex1 = vertices[triangle[1]];
+            let vertex2 = vertices[triangle[2]];
 
-            triangles.push(KDTriangle{
+            kd_tree_triangles.push(KDTriangle{
                 internal_triangle: Triangle {
                     vertex0,
                     vertex1,
@@ -86,28 +80,21 @@ impl KDTree
 
         let mut kd_tree = KDTree
         {
-            triangles,
+            triangles: kd_tree_triangles,
             triangle_ids,
             kd_nodes,
-            normals: mesh.triangle_normals.to_vec(),
-            t: mesh.t,
-            inv_t: mesh.inv_t,
-            obj_idx: mesh.obj_idx,
-            mat_idx: mesh.mat_idx,
             max_depth,
             max_triangles_in_leaf,
             scan_samples,
-            bounds: mesh.bounds
         };
 
-        kd_tree.build_tree(&start_triangle_ids);
+        kd_tree.build_tree(&start_triangle_ids, bounds);
 
         return kd_tree;
     }
 
-    fn build_tree(&mut self, start_ids: &Vec<usize>)
+    fn build_tree(&mut self, start_ids: &Vec<usize>, bounds: &AABB)
     {
-        let bounds = self.bounds;
         self.build(&bounds, 0, start_ids, 0);
     }
 
@@ -327,52 +314,14 @@ impl KDTree
         }
         return self.intersect_kd_node(ray, t, current_node.left_first, depth + 1, &left_bounds, mailbox) || intersection;
     }
-}
 
-impl RayHittableObject for KDTree
-{
-    fn intersect(&self, ray: &mut Ray) {
-        let origin = transform_position(&ray.origin, &self.inv_t );
-        let direction = transform_vector(&ray.direction, &self.inv_t );
-
-        let mut ray_t = Ray::directed_distance(origin, direction, ray.t);
-        ray_t.obj_idx = ray.obj_idx;
-
-        // check for intersection with boundary of mesh
-        let t = intersect_aabb(&mut ray_t, &self.bounds);
-        if t == 1e30
-        {
-            return;
-        }
+    pub fn intersect(&self, ray_t: &mut Ray, t: f32, bounds: &AABB) -> bool {
 
         let mut mailbox = BitVector::new(self.triangles.len());
-        let mut bounds = self.bounds;
+        let mut bounds = *bounds;
         bounds.max_bound += EPSILON_VECTOR;
         bounds.min_bound -= EPSILON_VECTOR;
-        if self.intersect_kd_node(&mut ray_t, t,0, 0, &bounds, &mut mailbox)
-        {
-            ray.t = ray_t.t;
-            ray.obj_type = RayHittableObjectType::KDTree;
-            ray.obj_idx = self.obj_idx;
-            ray.sub_obj_idx = ray_t.sub_obj_idx;
-        }
 
-        ray.intersection_tests += ray_t.intersection_tests;
-    }
-
-    fn get_normal(&self, ray: &Ray, i: &Float3) -> Float3 {
-        return self.normals[ray.sub_obj_idx];
-    }
-
-    fn get_uv(&self, i: &Float3) -> Float2 {
-        return Float2::zero();
-    }
-
-    fn is_occluded(&self, ray: &Ray) -> bool {
-        let mut shadow = ray.clone();
-        shadow.t = 1e34;
-        shadow.obj_idx = usize::MAX;
-        self.intersect(&mut shadow);
-        return shadow.obj_idx != usize::MAX;
+        return self.intersect_kd_node(ray_t, t, 0, 0, &bounds, &mut mailbox);
     }
 }

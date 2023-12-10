@@ -1,11 +1,12 @@
 use std::ops::{Deref};
 use crate::camera::Camera;
-use crate::scene::{MeshIntersectionSetting, Scene};
+use crate::scene::{Scene};
 use crate::timer::{FrameTimer,Timer};
 use imgui_glfw_rs::imgui::Ui;
 use imgui_glfw_rs::imgui::ImString;
 use crate::input::Input;
 use crate::renderer::{LightingMode, Renderer, RenderMode};
+use crate::objects::mesh::MeshIntersectionSetting;
 
 
 pub struct Application
@@ -85,6 +86,11 @@ impl Application
 
     fn handle_input(&mut self, input: &Input, delta_time: f32)
     {
+        if self.renderer.render_settings.mesh_intersection_setting != self.renderer.prev_render_settings.mesh_intersection_setting
+        {
+            self.scene.change_intersection_setting(&self.renderer.render_settings.mesh_intersection_setting);
+        }
+
         if input.is_key_pressed(glfw::Key::Space)
         {
             self.is_rendering = !self.is_rendering;
@@ -95,7 +101,7 @@ impl Application
                     self.renderer.reset_accumulator();
                 }
                 self.static_frame_timer.reset();
-                self.renderer.render_mode = RenderMode::Standard;
+                self.renderer.render_settings.render_mode = RenderMode::Standard;
 
                 println!("STARTED RENDER OF STATIC FRAME");
             }
@@ -127,11 +133,11 @@ impl Application
 
 
         ui.text(ImString::new("Render mode:").deref());
-        ui.radio_button(ImString::new("Ray tracing").deref(), &mut self.renderer.render_mode, RenderMode::Standard);
-        ui.radio_button(ImString::new("Normals").deref(), &mut self.renderer.render_mode, RenderMode::Normals);
-        ui.radio_button(ImString::new("Distance").deref(), &mut self.renderer.render_mode, RenderMode::Distance);
-        ui.radio_button(ImString::new("Complexity").deref(), &mut self.renderer.render_mode, RenderMode::Complexity);
-        ui.radio_button(ImString::new("Complexity - Relative").deref(), &mut self.renderer.render_mode, RenderMode::RelativeComplexity);
+        ui.radio_button(ImString::new("Ray tracing").deref(), &mut self.renderer.render_settings.render_mode, RenderMode::Standard);
+        ui.radio_button(ImString::new("Normals").deref(), &mut self.renderer.render_settings.render_mode, RenderMode::Normals);
+        ui.radio_button(ImString::new("Distance").deref(), &mut self.renderer.render_settings.render_mode, RenderMode::Distance);
+        ui.radio_button(ImString::new("Complexity").deref(), &mut self.renderer.render_settings.render_mode, RenderMode::Complexity);
+        ui.radio_button(ImString::new("Complexity - Relative").deref(), &mut self.renderer.render_settings.render_mode, RenderMode::RelativeComplexity);
 
         ui.slider_int(ImString::new("Max intersection Tests").deref(), &mut self.renderer.render_settings.max_expected_intersection_tests, 100, 1000 ).build();
 

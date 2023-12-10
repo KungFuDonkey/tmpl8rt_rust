@@ -9,10 +9,7 @@ pub enum RayHittableObjectType
     Cube,
     Torus,
     Quad,
-    Mesh,
-    Bvh,
-    Grid,
-    KDTree
+    Mesh
 }
 
 #[repr(C, align(64))]

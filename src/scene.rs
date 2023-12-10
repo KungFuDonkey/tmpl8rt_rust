@@ -13,19 +13,6 @@ use crate::objects::bvh::*;
 use crate::objects::grid::*;
 use crate::objects::kd_tree::*;
 
-#[derive(PartialEq, Copy, Clone, Debug)]
-pub enum MeshIntersectionSetting
-{
-    Raw,
-    Bvh4,
-    Bvh128,
-    BvhSpatial4,
-    BvhSpatial128,
-    Grid,
-    KDTree
-}
-
-
 pub struct Scene
 {
     spheres: Vec<Sphere>,
@@ -122,27 +109,20 @@ impl Scene
             animation_time: 0.0
         };
 
-        scene.construct_acceleration_structures();
-
         scene.set_time(0.0);
 
         return scene;
     }
 
-    fn construct_acceleration_structures(&mut self)
+    pub fn change_intersection_setting(&mut self, mesh_setting: &MeshIntersectionSetting)
     {
-        for mesh in &self.meshes
+        for mesh in &mut self.meshes
         {
-            self.grids.push(Grid::from_mesh(mesh, 64, 64, 64));
-            self.kd_trees.push(KDTree::from_mesh(mesh, 12, 16, 128));
-            self.bvh_4.push(BVH::from_mesh(mesh, 4));
-            self.bvh_128.push(BVH::from_mesh(mesh, 128));
-            self.bvh_spatial_4.push(BVH::from_mesh_spatial(mesh, 4));
-            self.bvh_spatial_128.push(BVH::from_mesh_spatial(mesh, 128));
+            mesh.mesh_intersection_setting = *mesh_setting;
         }
     }
 
-    pub fn intersect_scene(&self, ray: &mut Ray, mesh_setting: &MeshIntersectionSetting)
+    pub fn intersect_scene(&self, ray: &mut Ray)
     {
         for sphere in &self.spheres
         {
@@ -169,60 +149,13 @@ impl Scene
             quad.intersect(ray);
         }
 
-        match mesh_setting {
-            MeshIntersectionSetting::Raw =>
-            {
-                for mesh in &self.meshes
-                {
-                    mesh.intersect(ray);
-                }
-            },
-            MeshIntersectionSetting::Bvh4 =>
-            {
-                for bvh in &self.bvh_4
-                {
-                    bvh.intersect(ray);
-                }
-            },
-            MeshIntersectionSetting::Bvh128 =>
-            {
-                for bvh in &self.bvh_128
-                {
-                    bvh.intersect(ray);
-                }
-            },
-            MeshIntersectionSetting::BvhSpatial4 =>
-            {
-                for bvh in &self.bvh_spatial_4
-                {
-                    bvh.intersect(ray);
-                }
-            },
-            MeshIntersectionSetting::BvhSpatial128 =>
-            {
-                for bvh in &self.bvh_spatial_128
-                {
-                    bvh.intersect(ray);
-                }
-            },
-            MeshIntersectionSetting::Grid =>
-            {
-                for grid in &self.grids
-                {
-                    grid.intersect(ray);
-                }
-            },
-            MeshIntersectionSetting::KDTree =>
-            {
-                for kd_tree in &self.kd_trees
-                {
-                    kd_tree.intersect(ray);
-                }
-            }
+        for mesh in &self.meshes
+        {
+            mesh.intersect(ray);
         }
     }
 
-    pub fn is_occluded(&self, ray: &Ray, mesh_setting: &MeshIntersectionSetting) -> bool
+    pub fn is_occluded(&self, ray: &Ray) -> bool
     {
         for sphere in &self.spheres
         {
@@ -258,70 +191,11 @@ impl Scene
             }
         }
 
-        match mesh_setting {
-            MeshIntersectionSetting::Raw => {
-                for mesh in &self.meshes
-                {
-                    if mesh.is_occluded(ray)
-                    {
-                        return true;
-                    }
-                }
-            }
-            MeshIntersectionSetting::Bvh4 => {
-                for bvh in &self.bvh_4
-                {
-                    if bvh.is_occluded(ray)
-                    {
-                        return true;
-                    }
-                }
-            }
-            MeshIntersectionSetting::BvhSpatial4 => {
-                for bvh in &self.bvh_spatial_4
-                {
-                    if bvh.is_occluded(ray)
-                    {
-                        return true;
-                    }
-                }
-            }
-            MeshIntersectionSetting::Bvh128 => {
-                for bvh in &self.bvh_128
-                {
-                    if bvh.is_occluded(ray)
-                    {
-                        return true;
-                    }
-                }
-            }
-            MeshIntersectionSetting::BvhSpatial128 => {
-                for bvh in &self.bvh_spatial_128
-                {
-                    if bvh.is_occluded(ray)
-                    {
-                        return true;
-                    }
-                }
-            }
-            MeshIntersectionSetting::Grid => {
-                for grid in &self.grids
-                {
-                    if grid.is_occluded(ray)
-                    {
-                        return true;
-                    }
-                }
-            }
-            MeshIntersectionSetting::KDTree =>
+        for mesh in &self.meshes
+        {
+            if mesh.is_occluded(ray)
             {
-                for kd_tree in &self.kd_trees
-                {
-                    if kd_tree.is_occluded(ray)
-                    {
-                        return true;
-                    }
-                }
+                return true;
             }
         }
 
@@ -340,7 +214,7 @@ impl Scene
         }
     }
 
-    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, sample_size: usize, seed: &mut u32, mesh_setting: &MeshIntersectionSetting) -> Float3
+    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, sample_size: usize, seed: &mut u32) -> Float3
     {
         let total_sample_points = sample_size;
         let sample_strength = 1.0 / (total_sample_points as f32);
@@ -356,7 +230,7 @@ impl Scene
             let origin = (*point) + (EPSILON * ray_dir_n);
             let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
 
-            if self.is_occluded(&ray, mesh_setting)
+            if self.is_occluded(&ray)
             {
                 continue;
             }
@@ -369,7 +243,7 @@ impl Scene
         return lighting;
     }
 
-    pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3, mesh_setting: &MeshIntersectionSetting) -> Float3
+    pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3) -> Float3
     {
         let total_sample_points = self.quads.len() as u32;
         let light_strength = 1.0 / (total_sample_points as f32);
@@ -382,7 +256,7 @@ impl Scene
             let origin = (*point) + (EPSILON * ray_dir_n);
             let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
 
-            if self.is_occluded(&ray, mesh_setting)
+            if self.is_occluded(&ray)
             {
                 continue;
             }
@@ -397,7 +271,7 @@ impl Scene
     }
 
 
-    pub fn get_normal(&self, ray: &Ray, i: &Float3, wo: &Float3, mesh_intersection_setting: &MeshIntersectionSetting) -> Float3
+    pub fn get_normal(&self, ray: &Ray, i: &Float3, wo: &Float3) -> Float3
     {
         let obj_idx = ray.obj_idx;
         if obj_idx == usize::MAX
@@ -437,25 +311,6 @@ impl Scene
             RayHittableObjectType::Quad =>
             {
                 self.quads[obj_idx].get_normal(ray, i)
-            }
-            RayHittableObjectType::Bvh =>
-            {
-                match mesh_intersection_setting
-                {
-                    MeshIntersectionSetting::Bvh4 => self.bvh_4[obj_idx].get_normal(ray, i),
-                    MeshIntersectionSetting::Bvh128 => self.bvh_128[obj_idx].get_normal(ray, i),
-                    MeshIntersectionSetting::BvhSpatial4 => self.bvh_spatial_4[obj_idx].get_normal(ray, i),
-                    MeshIntersectionSetting::BvhSpatial128 => self.bvh_spatial_128[obj_idx].get_normal(ray, i),
-                    _ => Float3::zero()
-                }
-            }
-            RayHittableObjectType::Grid =>
-            {
-                self.grids[obj_idx].get_normal(ray, i)
-            }
-            RayHittableObjectType::KDTree =>
-            {
-                self.kd_trees[obj_idx].get_normal(ray, i)
             }
         };
 
@@ -499,18 +354,6 @@ impl Scene
             RayHittableObjectType::Torus =>
             {
                 self.tori[obj_idx as usize].mat_idx
-            },
-            RayHittableObjectType::Bvh =>
-            {
-                self.meshes[obj_idx as usize].mat_idx
-            },
-            RayHittableObjectType::Grid =>
-            {
-                self.grids[obj_idx as usize].mat_idx
-            },
-            RayHittableObjectType::KDTree =>
-            {
-                self.kd_trees[obj_idx].mat_idx
             }
         };
         &self.materials[mat_idx as usize]
@@ -544,82 +387,48 @@ impl Scene
             },
             RayHittableObjectType::Mesh =>
             {
-                // should get uv from triangle
                 self.meshes[obj_idx].get_uv(i)
             },
             RayHittableObjectType::Torus =>
             {
                 self.tori[obj_idx].get_uv(i)
-            },
-            RayHittableObjectType::Bvh =>
-            {
-                self.meshes[obj_idx].get_uv(i)
-            },
-            RayHittableObjectType::Grid =>
-            {
-                self.grids[obj_idx].get_uv(i)
-            },
-            RayHittableObjectType::KDTree =>
-            {
-                self.kd_trees[obj_idx].get_uv(i)
             }
         }
     }
 
-    pub fn intersect_object(&self, ray: &mut Ray, obj_idx: usize, obj_type: RayHittableObjectType, mesh_intersection_setting: &MeshIntersectionSetting)
+    pub fn intersect_object(&self, ray: &mut Ray, obj_idx: usize, obj_type: RayHittableObjectType)
     {
         let obj_idx = obj_idx as usize;
         let obj_type = obj_type;
         match obj_type
         {
             RayHittableObjectType::None =>
-            {
-
-            },
+                {},
             RayHittableObjectType::Sphere =>
-            {
-                self.spheres[obj_idx].intersect(ray);
-            },
-            RayHittableObjectType::Plane =>
-            {
-                self.planes[obj_idx].intersect(ray)
-            },
-            RayHittableObjectType::Cube =>
-            {
-                self.cubes[obj_idx].intersect(ray)
-            },
-            RayHittableObjectType::Quad =>
-            {
-                self.quads[obj_idx].intersect(ray)
-            },
-            RayHittableObjectType::Mesh =>
-            {
-                // should get uv from triangle
-                self.meshes[obj_idx].intersect(ray)
-            },
-            RayHittableObjectType::Torus =>
-            {
-                self.tori[obj_idx].intersect(ray)
-            },
-            RayHittableObjectType::Bvh =>
-            {
-                match mesh_intersection_setting
                 {
-                    MeshIntersectionSetting::Bvh4 => self.bvh_4[obj_idx].intersect(ray),
-                    MeshIntersectionSetting::Bvh128 => self.bvh_128[obj_idx].intersect(ray),
-                    MeshIntersectionSetting::BvhSpatial4 => self.bvh_spatial_4[obj_idx].intersect(ray),
-                    MeshIntersectionSetting::BvhSpatial128 => self.bvh_spatial_128[obj_idx].intersect(ray),
-                    _ => panic!("cannot reach this")
+                    self.spheres[obj_idx].intersect(ray);
+                },
+            RayHittableObjectType::Plane =>
+                {
+                    self.planes[obj_idx].intersect(ray)
+                },
+            RayHittableObjectType::Cube =>
+                {
+                    self.cubes[obj_idx].intersect(ray)
+                },
+            RayHittableObjectType::Quad =>
+                {
+                    self.quads[obj_idx].intersect(ray)
+                },
+            RayHittableObjectType::Mesh =>
+                {
+                    // should get uv from triangle
+                    self.meshes[obj_idx].intersect(ray)
+                },
+            RayHittableObjectType::Torus =>
+                {
+                    self.tori[obj_idx].intersect(ray)
                 }
-            },
-            RayHittableObjectType::Grid =>
-            {
-                self.grids[obj_idx].intersect(ray)
-            },
-            RayHittableObjectType::KDTree =>
-            {
-                self.kd_trees[obj_idx].intersect(ray)
-            }
         }
     }
 

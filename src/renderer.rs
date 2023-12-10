@@ -2,9 +2,10 @@ use crate::camera::Camera;
 use crate::math::*;
 use crate::surface::*;
 use crate::material::*;
-use crate::scene::{MeshIntersectionSetting, Scene};
+use crate::scene::{Scene};
 use crate::ray::*;
 use rayon::prelude::*;
+use crate::objects::mesh::MeshIntersectionSetting;
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum RenderMode
@@ -24,9 +25,11 @@ pub enum LightingMode
     HardShadows
 }
 
+#[derive(PartialEq, Copy, Clone, Debug)]
 pub struct RenderSettings
 {
     pub max_bounces: i32,
+    pub render_mode: RenderMode,
     pub lighting_mode: LightingMode,
     pub area_sample_size: i32,
     pub mesh_intersection_setting: MeshIntersectionSetting,
@@ -39,12 +42,10 @@ pub struct Renderer
     accumulator: Vec<Float3>,
     pub random_seeds: Vec<u32>,
     pub render_target: Surface,
-    pub render_mode: RenderMode,
     pub render_settings: RenderSettings,
+    pub prev_render_settings: RenderSettings,
     seed: u32,
     accumulated_pixels: u32,
-    prev_render_mode: RenderMode,
-    prev_lighting_mode: LightingMode
 }
 
 
@@ -55,43 +56,42 @@ impl Renderer
         let seed_base: u32 = 0x123456;
         let seed = init_seed(seed_base);
 
-        let render_mode = RenderMode::Complexity;
+        let render_settings = RenderSettings {
+            max_bounces: 1,
+            render_mode: RenderMode::Complexity,
+            lighting_mode: LightingMode::None,
+            area_sample_size: 1,
+            mesh_intersection_setting: MeshIntersectionSetting::Grid,
+            max_expected_intersection_tests: 1000
+        };
 
         Renderer{
             accumulator: vec![Float3::zero(); SCRWIDTH * SCRHEIGHT],
             random_seeds: vec![0; SCRWIDTH * SCRHEIGHT],
             render_target: Surface::new(),
-            render_settings: RenderSettings {
-                max_bounces: 1,
-                lighting_mode: LightingMode::None,
-                area_sample_size: 1,
-                mesh_intersection_setting: MeshIntersectionSetting::Grid,
-                max_expected_intersection_tests: 1000
-            },
+            render_settings: render_settings,
+            prev_render_settings: render_settings,
             seed,
             accumulated_pixels: 0,
-            render_mode,
-            prev_render_mode: render_mode,
-            prev_lighting_mode: LightingMode::None
         }
     }
 
     fn render_normals(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings) -> Float3
     {
-        scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
+        scene.intersect_scene(ray);
         if ray.obj_idx == usize::MAX
         {
             return Float3::zero();
         }
         let intersection = ray.intersection_point();
-        let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
+        let normal = scene.get_normal(ray, &intersection, &ray.direction);
 
         return (normal + 1.0) * 0.5;
     }
 
     fn render_distances(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings) -> Float3
     {
-        scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
+        scene.intersect_scene(ray);
         if ray.obj_idx == usize::MAX
         {
             return Float3::zero();
@@ -101,7 +101,7 @@ impl Renderer
 
     fn render_complexity(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings) -> u32
     {
-        scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
+        scene.intersect_scene(ray);
 
         return ray.intersection_tests;
     }
@@ -110,15 +110,15 @@ impl Renderer
     {
         let lighting: Float3 = match render_settings.lighting_mode {
             LightingMode::None => Float3::from_a(1.0),
-            LightingMode::HardShadows => scene.direct_lighting_hard(&intersection, &scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting), &render_settings.mesh_intersection_setting),
-            LightingMode::SoftShadows => scene.direct_lighting_soft(&intersection, &scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting), render_settings.area_sample_size as usize, seed, &render_settings.mesh_intersection_setting)
+            LightingMode::HardShadows => scene.direct_lighting_hard(&intersection, &scene.get_normal(ray, &intersection, &ray.direction)),
+            LightingMode::SoftShadows => scene.direct_lighting_soft(&intersection, &scene.get_normal(ray, &intersection, &ray.direction), render_settings.area_sample_size as usize, seed)
         };
         return lighting * Self::get_color_from_material(ray, scene, &intersection, material);
     }
 
     fn trace(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings, seed: &mut u32, bounces: i32) -> Float3
     {
-        scene.intersect_scene(ray, &render_settings.mesh_intersection_setting);
+        scene.intersect_scene(ray);
         if ray.obj_idx == usize::MAX
         {
             return Float3::zero();
@@ -135,7 +135,7 @@ impl Renderer
         {
             Material::ReflectiveMaterial(reflection_material, reflectivity) =>
             {
-                let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
+                let normal = scene.get_normal(ray, &intersection, &ray.direction);
                 let reflected_ray_direction = reflect(&ray.direction, &normal);
                 let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
                 let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, reflection_material);
@@ -144,7 +144,7 @@ impl Renderer
             }
             Material::FullyReflectiveMaterial(reflection_material) =>
             {
-                let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
+                let normal = scene.get_normal(ray, &intersection, &ray.direction);
                 let reflected_ray_direction = reflect(&ray.direction, &normal);
                 let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
                 let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, reflection_material);
@@ -155,7 +155,7 @@ impl Renderer
                 // currently broken
                 // assumes no collisions with any other objects, so a full glass ball with no objects inside
 
-                let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
+                let normal = scene.get_normal(ray, &intersection, &ray.direction);
                 let reversed_dir = -ray.direction;
                 let theta1 = dot( &normal, &reversed_dir);
                 let theta1_2 = theta1 * theta1;
@@ -166,7 +166,7 @@ impl Renderer
 
                 if k < 0.0
                 {
-                    let normal = scene.get_normal(ray, &intersection, &ray.direction, &render_settings.mesh_intersection_setting);
+                    let normal = scene.get_normal(ray, &intersection, &ray.direction);
                     let reflected_ray_direction = reflect(&ray.direction, &normal);
                     let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
                     let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, refractive_material);
@@ -178,13 +178,13 @@ impl Renderer
                 let mut refract_ray = Ray::directed(intersection + EPSILON * refract_direction, refract_direction);
 
                 // only do self intersection
-                scene.intersect_object(&mut refract_ray, ray.obj_idx as usize, ray.obj_type, &render_settings.mesh_intersection_setting);
+                scene.intersect_object(&mut refract_ray, ray.obj_idx as usize, ray.obj_type);
                 if refract_ray.obj_idx == usize::MAX
                 {
                     println!("no int");
                     return Float3::zero();
                 }
-                let refract_normal = scene.get_normal(&refract_ray, &intersection, &refract_direction, &render_settings.mesh_intersection_setting);
+                let refract_normal = scene.get_normal(&refract_ray, &intersection, &refract_direction);
                 let reversed_refract_dir = -refract_direction;
                 let theta1 = dot (&refract_normal, &reversed_refract_dir);
                 let theta1_2 = theta1 * theta1;
@@ -213,19 +213,18 @@ impl Renderer
 
     pub fn render(&mut self, scene: &Scene, camera: &Camera)
     {
-        if self.prev_render_mode != self.render_mode || self.render_settings.lighting_mode != self.prev_lighting_mode
+        if self.render_settings.render_mode != self.prev_render_settings.render_mode || self.render_settings.lighting_mode != self.prev_render_settings.lighting_mode
         {
             self.reset_accumulator();
         }
-        self.prev_render_mode = self.render_mode;
-        self.prev_lighting_mode = self.render_settings.lighting_mode;
+        self.prev_render_settings = self.render_settings;
 
         for i in 0..(SCRWIDTH * SCRHEIGHT)
         {
             self.random_seeds[i] = random_uint_s(&mut self.seed);
         }
 
-        match self.render_mode {
+        match self.render_settings.render_mode {
             RenderMode::Standard => {
                 self.accumulated_pixels += 1;
 

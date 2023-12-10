@@ -1,6 +1,21 @@
 use crate::math::*;
 use crate::ray::*;
 use crate::objects::aabb::{AABB, intersect_aabb};
+use crate::objects::bvh::*;
+use crate::objects::kd_tree::*;
+use crate::objects::grid::*;
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum MeshIntersectionSetting
+{
+    Raw,
+    Bvh4,
+    Bvh128,
+    BvhSpatial4,
+    BvhSpatial128,
+    Grid,
+    KDTree
+}
 
 pub struct Mesh
 {
@@ -11,7 +26,14 @@ pub struct Mesh
     pub mat_idx: usize,
     pub t: Mat4,
     pub inv_t: Mat4,
-    pub bounds: AABB
+    pub bounds: AABB,
+    pub bvh_4: BVH,
+    pub bvh_128: BVH,
+    pub bvh_spatial_4: BVH,
+    pub bvh_spatial_128: BVH,
+    pub grid: Grid,
+    pub kd_tree: KDTree,
+    pub mesh_intersection_setting: MeshIntersectionSetting
 }
 
 impl Mesh
@@ -47,6 +69,13 @@ impl Mesh
 
         let bounds = Mesh::compute_bounds(&vertices);
 
+        let bvh_4 = BVH::from_mesh(&triangles, &vertices, &bounds, 4);
+        let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
+        let bvh_spatial_4 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 4);
+        let bvh_spatial_128 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 128);
+        let kd_tree = KDTree::from_mesh(&triangles, &vertices, &bounds, 12, 16, 128);
+        let grid = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
+
         Mesh
         {
             vertices,
@@ -56,7 +85,14 @@ impl Mesh
             mat_idx,
             t: transform,
             inv_t: transform.inverted(),
-            bounds
+            bounds,
+            mesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
+            bvh_4,
+            bvh_128,
+            bvh_spatial_4,
+            bvh_spatial_128,
+            kd_tree,
+            grid
         }
     }
 
@@ -68,6 +104,13 @@ impl Mesh
         let triangle_normals = Mesh::compute_normals(&triangles, &vertices, &transform);
         let bounds = Mesh::compute_bounds(&vertices);
 
+        let bvh_4 = BVH::from_mesh(&triangles, &vertices, &bounds, 4);
+        let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
+        let bvh_spatial_4 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 4);
+        let bvh_spatial_128 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 128);
+        let kd_tree = KDTree::from_mesh(&triangles, &vertices, &bounds, 12, 16, 128);
+        let grid = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
+
         Mesh
         {
             vertices,
@@ -77,7 +120,14 @@ impl Mesh
             mat_idx,
             t: transform,
             inv_t: transform.inverted(),
-            bounds
+            bounds,
+            mesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
+            bvh_4,
+            bvh_128,
+            bvh_spatial_4,
+            bvh_spatial_128,
+            kd_tree,
+            grid
         }
     }
 
@@ -87,6 +137,13 @@ impl Mesh
 
         let bounds = Mesh::compute_bounds(&vertices);
 
+        let bvh_4 = BVH::from_mesh(&triangles, &vertices, &bounds, 4);
+        let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
+        let bvh_spatial_4 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 4);
+        let bvh_spatial_128 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 128);
+        let kd_tree = KDTree::from_mesh(&triangles, &vertices, &bounds, 12, 16, 128);
+        let grid = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
+
         Mesh
         {
             vertices,
@@ -96,7 +153,14 @@ impl Mesh
             mat_idx,
             t: transform,
             inv_t: transform.inverted(),
-            bounds
+            bounds,
+            mesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
+            bvh_4,
+            bvh_128,
+            bvh_spatial_4,
+            bvh_spatial_128,
+            kd_tree,
+            grid
         }
     }
 
@@ -225,10 +289,41 @@ impl RayHittableObject for Mesh
         }
 
         let mut intersected = false;
-        for (triangle_index, triangle) in self.triangles.iter().enumerate()
+        match self.mesh_intersection_setting
         {
-            intersected = self.intersect_triangle(&mut ray_t, triangle[0], triangle[1], triangle[2], triangle_index) || intersected;
+            MeshIntersectionSetting::Raw =>
+            {
+                for (triangle_index, triangle) in self.triangles.iter().enumerate()
+                {
+                    intersected = self.intersect_triangle(&mut ray_t, triangle[0], triangle[1], triangle[2], triangle_index) || intersected;
+                }
+            },
+            MeshIntersectionSetting::Bvh4 =>
+            {
+                intersected = self.bvh_4.intersect(&mut ray_t);
+            },
+            MeshIntersectionSetting::Bvh128 =>
+            {
+                intersected = self.bvh_128.intersect(&mut ray_t);
+            },
+            MeshIntersectionSetting::BvhSpatial4 =>
+            {
+                intersected = self.bvh_spatial_4.intersect(&mut ray_t);
+            },
+            MeshIntersectionSetting::BvhSpatial128 =>
+            {
+                intersected = self.bvh_spatial_128.intersect(&mut ray_t);
+            }
+            MeshIntersectionSetting::KDTree =>
+            {
+                intersected = self.kd_tree.intersect(&mut ray_t, t, &self.bounds);
+            }
+            MeshIntersectionSetting::Grid =>
+            {
+                intersected = self.grid.intersect(&mut ray_t, t);
+            }
         }
+
 
         ray.intersection_tests += ray_t.intersection_tests;
         if intersected
@@ -250,13 +345,10 @@ impl RayHittableObject for Mesh
     }
 
     fn is_occluded(&self, ray: &Ray) -> bool {
-        for triangle in &self.triangles
-        {
-            if self.is_occluded_triangle(ray, triangle[0], triangle[1], triangle[2])
-            {
-                return true;
-            }
-        }
-        return false;
+        let mut shadow = ray.clone();
+        shadow.t = 1e34;
+        shadow.obj_idx = usize::MAX;
+        self.intersect(&mut shadow);
+        return shadow.obj_idx != usize::MAX;
     }
 }

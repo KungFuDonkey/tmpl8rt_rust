@@ -162,30 +162,25 @@ pub struct BVH
     pub triangle_ptr: usize,
     pub spatial_splits: usize,
     pub is_spatial: bool,
-    pub t: Mat4,
-    pub inv_t: Mat4,
-    pub normals: Vec<Float3>,
-    pub bin_size: usize,
-    pub obj_idx: usize,
-    pub mat_idx: usize
+    pub bin_size: usize
 }
 
 impl BVH
 {
-    pub fn from_mesh(mesh: &Mesh, bin_size: usize) -> Self
+    pub fn from_mesh(triangles: &Vec<[usize; 3]>, vertices: &Vec<Float3>, bounds: &AABB, bin_size: usize) -> Self
     {
-        let prim_count = mesh.triangles.len();
-        let mut triangles: Vec<BVHTriangle> = Vec::with_capacity(prim_count);
+        let prim_count = triangles.len();
+        let mut bvh_triangles: Vec<BVHTriangle> = Vec::with_capacity(prim_count);
         let mut triangle_idx: Vec<usize> = Vec::with_capacity(prim_count);
 
         let mut tri_idx = 0;
-        for triangle in &mesh.triangles
+        for triangle in triangles
         {
-            let vertex0 = mesh.vertices[triangle[0]];
-            let vertex1 = mesh.vertices[triangle[1]];
-            let vertex2 = mesh.vertices[triangle[2]];
+            let vertex0 = vertices[triangle[0]];
+            let vertex1 = vertices[triangle[1]];
+            let vertex2 = vertices[triangle[2]];
 
-            triangles.push(BVHTriangle
+            bvh_triangles.push(BVHTriangle
             {
                 bounds: AABB::from_empty(),
                 internal_triangle: Triangle{
@@ -202,7 +197,7 @@ impl BVH
         // build bvh
         let mut bvh_nodes: Vec<BVHNode> = Vec::with_capacity(prim_count * 2);
 
-        triangles.iter_mut().for_each(|triangle|
+        bvh_triangles.iter_mut().for_each(|triangle|
         {
             triangle.bounds = AABB::from_bounds(&triangle.internal_triangle.vertex0, &triangle.internal_triangle.vertex0);
             triangle.bounds.grow(&triangle.internal_triangle.vertex1);
@@ -212,7 +207,7 @@ impl BVH
         let root = BVHNode {
             left_first: 0,
             tri_count: prim_count,
-            bounds: mesh.bounds
+            bounds: *bounds
         };
 
         bvh_nodes.push(root);
@@ -233,7 +228,7 @@ impl BVH
 
         let mut bvh = BVH
         {
-            triangles,
+            triangles: bvh_triangles,
             bvh_nodes,
             triangle_idx,
             triangle_tmp: Vec::new(),
@@ -242,11 +237,6 @@ impl BVH
             triangle_ptr: prim_count,
             spatial_splits,
             is_spatial: false,
-            t: mesh.t,
-            inv_t: mesh.inv_t,
-            normals: mesh.triangle_normals.to_vec(),
-            obj_idx: mesh.obj_idx,
-            mat_idx: mesh.mat_idx,
             bin_size
         };
 
@@ -261,21 +251,21 @@ impl BVH
         return bvh;
     }
 
-    pub fn from_mesh_spatial(mesh: &Mesh, bin_size: usize) -> Self
+    pub fn from_mesh_spatial(triangles: &Vec<[usize; 3]>, vertices: &Vec<Float3>, bounds: &AABB, bin_size: usize) -> Self
     {
-        let prim_count = mesh.triangles.len();
-        let mut triangles: Vec<BVHTriangle> = Vec::with_capacity(prim_count * 2);
+        let prim_count = triangles.len();
+        let mut bvh_triangles: Vec<BVHTriangle> = Vec::with_capacity(prim_count * 2);
         let mut triangle_idx: Vec<usize> = Vec::with_capacity(prim_count * 2);
         let mut triangle_tmp: Vec<usize> = Vec::with_capacity(prim_count * 2);
 
         let mut tri_idx = 0;
-        for triangle in &mesh.triangles
+        for triangle in triangles
         {
-            let vertex0 = mesh.vertices[triangle[0]];
-            let vertex1 = mesh.vertices[triangle[1]];
-            let vertex2 = mesh.vertices[triangle[2]];
+            let vertex0 = vertices[triangle[0]];
+            let vertex1 = vertices[triangle[1]];
+            let vertex2 = vertices[triangle[2]];
 
-            triangles.push(BVHTriangle
+            bvh_triangles.push(BVHTriangle
             {
                 bounds: AABB::from_empty(),
                 internal_triangle: Triangle{
@@ -293,7 +283,7 @@ impl BVH
         // build bvh
         let mut bvh_nodes: Vec<BVHNode> = Vec::with_capacity(prim_count * 4);
 
-        triangles.iter_mut().for_each(|triangle|
+        bvh_triangles.iter_mut().for_each(|triangle|
             {
                 triangle.bounds = AABB::from_bounds(&triangle.internal_triangle.vertex0, &triangle.internal_triangle.vertex0);
                 triangle.bounds.grow(&triangle.internal_triangle.vertex1);
@@ -303,7 +293,7 @@ impl BVH
         let root = BVHNode {
             left_first: 0,
             tri_count: prim_count,
-            bounds: mesh.bounds
+            bounds: *bounds
         };
 
         bvh_nodes.push(root);
@@ -322,9 +312,9 @@ impl BVH
 
         let spatial_splits: usize = 0;
 
-        for _ in &mesh.triangles
+        for _ in triangles
         {
-            triangles.push(BVHTriangle
+            bvh_triangles.push(BVHTriangle
             {
                 bounds: AABB::from_empty(),
                 internal_triangle: Triangle{
@@ -340,7 +330,7 @@ impl BVH
 
         let mut bvh = BVH
         {
-            triangles,
+            triangles: bvh_triangles,
             bvh_nodes,
             triangle_idx,
             triangle_tmp,
@@ -349,11 +339,6 @@ impl BVH
             triangle_ptr: prim_count,
             spatial_splits,
             is_spatial: true,
-            t: mesh.t,
-            inv_t: mesh.inv_t,
-            normals: mesh.triangle_normals.to_vec(),
-            obj_idx: mesh.obj_idx,
-            mat_idx: mesh.mat_idx,
             bin_size
         };
 
@@ -770,18 +755,8 @@ impl BVH
         self.subdivide(left_child_idx, half_slack);
         self.subdivide(right_child_idx, half_slack);
     }
-}
 
-impl RayHittableObject for BVH
-{
-    fn intersect(&self, ray: &mut Ray) {
-        let origin = transform_position(&ray.origin, &self.inv_t );
-        let direction = transform_vector(&ray.direction, &self.inv_t );
-
-        let mut ray_t = Ray::directed_distance(origin, direction, ray.t);
-        ray_t.obj_idx = ray.obj_idx;
-        ray_t.obj_type = ray.obj_type;
-
+    pub fn intersect(&self, ray_t: &mut Ray) -> bool {
         let mut mailbox = BitVector::new(self.triangles.len());
         let mut node = &self.bvh_nodes[self.root_node_idx];
         let mut stack = [BVHNode{
@@ -805,7 +780,7 @@ impl RayHittableObject for BVH
                         continue;
                     }
                     mailbox.set_true(id);
-                    intersected = intersect_triangle(&self.triangles[id].internal_triangle, &mut ray_t) || intersected
+                    intersected = intersect_triangle(&self.triangles[id].internal_triangle, ray_t) || intersected
                 }
 
                 if stack_ptr == 0
@@ -821,8 +796,8 @@ impl RayHittableObject for BVH
             }
             let mut child1 = &self.bvh_nodes[node.left_first];
             let mut child2 = &self.bvh_nodes[node.left_first + 1];
-            let mut dist1 = intersect_aabb( &mut ray_t, &child1.bounds );
-            let mut dist2 = intersect_aabb( &mut ray_t, &child2.bounds );
+            let mut dist1 = intersect_aabb(ray_t, &child1.bounds );
+            let mut dist2 = intersect_aabb(ray_t, &child2.bounds );
             if dist1 > dist2
             {
                 let tmp = dist1;
@@ -852,29 +827,7 @@ impl RayHittableObject for BVH
                 stack_ptr += 1;
             }
         }
-        ray.t = ray_t.t;
-        ray.intersection_tests += ray_t.intersection_tests;
-        if intersected
-        {
-            ray.obj_idx = self.obj_idx;
-            ray.obj_type = RayHittableObjectType::Bvh;
-            ray.sub_obj_idx = ray_t.sub_obj_idx;
-        }
-    }
 
-    fn get_normal(&self, ray: &Ray, i: &Float3) -> Float3 {
-        return self.normals[ray.sub_obj_idx];
-    }
-
-    fn get_uv(&self, i: &Float3) -> Float2 {
-        return Float2::zero();
-    }
-
-    fn is_occluded(&self, ray: &Ray) -> bool {
-        let mut shadow = ray.clone();
-        shadow.t = 1e34;
-        shadow.obj_idx = usize::MAX;
-        self.intersect(&mut shadow);
-        return shadow.obj_idx != usize::MAX;
+        return intersected;
     }
 }
