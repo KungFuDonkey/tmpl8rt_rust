@@ -105,7 +105,7 @@ impl KDTree
         let range = max_value - min_value;
         let step_size = range / (self.scan_samples as f32);
         let mut best_value: f32 = 1e30;
-        let mut best_score: usize = 0;
+        let mut best_cost: f32 = 1e30;
 
         let mut current_value = min_value;
         for i in 0..self.scan_samples
@@ -114,10 +114,14 @@ impl KDTree
 
             let (left_indices, right_indices) = self.partition_ids(current_value, axis, triangle_ids);
             let same_indices = left_indices.len() + right_indices.len() - triangle_ids.len();
-            let split_score = (left_indices.len() - same_indices) * (right_indices.len() - same_indices);
-            if split_score > best_score
+            let mut left_bounds = bounds.clone();
+            left_bounds.max_bound.set_axis(axis, current_value);
+            let mut right_bounds = bounds.clone();
+            right_bounds.min_bound.set_axis(axis, current_value);
+            let split_cost = (left_indices.len() as f32) * (left_bounds.area()) + (right_indices.len() as f32) * (right_bounds.area());
+            if split_cost < best_cost
             {
-                best_score = split_score;
+                best_cost = split_cost;
                 best_value = current_value;
             }
         }
