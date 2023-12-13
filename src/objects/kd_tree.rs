@@ -113,7 +113,6 @@ impl KDTree
             current_value += step_size;
 
             let (left_indices, right_indices) = self.partition_ids(current_value, axis, triangle_ids);
-            let same_indices = left_indices.len() + right_indices.len() - triangle_ids.len();
             let mut left_bounds = bounds.clone();
             left_bounds.max_bound.set_axis(axis, current_value);
             let mut right_bounds = bounds.clone();

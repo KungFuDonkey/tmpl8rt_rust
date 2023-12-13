@@ -78,7 +78,7 @@ impl Renderer
             render_mode: RenderMode::Complexity,
             lighting_mode: LightingMode::None,
             area_sample_size: 1,
-            mesh_intersection_setting: MeshIntersectionSetting::Grid64,
+            mesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
             max_expected_intersection_tests: 1000,
             complexity_mode: ComplexityMode::Primary
         };

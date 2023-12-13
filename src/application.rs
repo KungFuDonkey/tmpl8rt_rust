@@ -30,10 +30,15 @@ impl Application
 {
     pub fn new() -> Self
     {
+
+        let renderer = Renderer::new();
+        let mut scene = Scene::new();
+        scene.change_intersection_setting(&renderer.render_settings.mesh_intersection_setting);
+
         Application {
-            renderer: Renderer::new(),
+            renderer,
             camera: Camera::new(),
-            scene: Scene::new(),
+            scene,
             is_animating: false,
             is_rendering: true,
             animation_time: 0.0,
