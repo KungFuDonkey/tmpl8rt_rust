@@ -121,6 +121,47 @@ impl Camera
             changed = true;
         }
 
+        if input.is_key_pressed(glfw::Key::N)
+        {
+            println!("{:?} {:?}", self.position, self.target);
+        }
+
+        if input.is_key_down(glfw::Key::Num1)
+        {
+            self.position = Float3::from_xyz(0.0, 0.0, -2.0);
+            self.target = Float3::from_xyz(0.0, 0.0, -1.0);
+            let dir = self.target - self.position;
+            ahead = normalize( &dir );
+            let tmp_up = Float3::from_xyz(0.0, 1.0, 0.0);
+            right = normalize(&cross(&tmp_up, &ahead));
+            up = normalize(&cross( &ahead, &right ));
+            changed = true;
+        }
+
+        if input.is_key_pressed(glfw::Key::Num2)
+        {
+            self.position = Float3::from_xyz(-0.85359, 0.0, 0.38007534);
+            self.target = Float3::from_xyz(0.038701177, 0.0, 0.8315358);
+            let dir = self.target - self.position;
+            ahead = normalize( &dir );
+            let tmp_up = Float3::from_xyz(0.0, 1.0, 0.0);
+            right = normalize(&cross(&tmp_up, &ahead));
+            up = normalize(&cross( &ahead, &right ));
+            changed = true;
+        }
+
+        if input.is_key_pressed(glfw::Key::Num3)
+        {
+            self.position = Float3::from_xyz( 0.36061686, 1.8355303, 3.2194953);
+            self.target = Float3::from_xyz(-0.0064440668, 1.2205365,  2.5216064);
+            let dir = self.target - self.position;
+            ahead = normalize( &dir );
+            let tmp_up = Float3::from_xyz(0.0, 1.0, 0.0);
+            right = normalize(&cross(&tmp_up, &ahead));
+            up = normalize(&cross( &ahead, &right ));
+            changed = true;
+        }
+
         if !changed
         {
             return false;

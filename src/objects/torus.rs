@@ -201,8 +201,9 @@ impl RayHittableObject for Torus
         Float2::zero()
     }
 
-    fn is_occluded(&self, ray: &Ray) -> bool {
+    fn is_occluded(&self, ray: &mut Ray) -> bool {
         // via: https://www.shadertoy.com/view/4sBGDy
+        ray.intersection_tests += 1;
         let origin = transform_position(&ray.origin, &self.inv_t );
         let direction = transform_vector(&ray.direction, &self.inv_t );
         let mut po = 1.0;

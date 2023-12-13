@@ -5,7 +5,7 @@ use crate::timer::{FrameTimer,Timer};
 use imgui_glfw_rs::imgui::Ui;
 use imgui_glfw_rs::imgui::ImString;
 use crate::input::Input;
-use crate::renderer::{LightingMode, Renderer, RenderMode};
+use crate::renderer::{ComplexityMode, LightingMode, Renderer, RenderMode};
 use crate::objects::mesh::MeshIntersectionSetting;
 
 
@@ -112,6 +112,15 @@ impl Application
             return;
         }
 
+        if input.is_key_pressed(glfw::Key::C)
+        {
+            if self.renderer.render_settings.render_mode == RenderMode::Complexity || self.renderer.render_settings.render_mode == RenderMode::RelativeComplexity
+            {
+                println!("{} {} {}", self.renderer.complexity_max, self.renderer.complexity_min, self.renderer.avg_complexity);
+            }
+            self.renderer.export_frame(delta_time);
+        }
+
         if self.camera.handle_input(&input, delta_time)
         {
             self.renderer.reset_accumulator();
@@ -141,11 +150,19 @@ impl Application
 
         ui.slider_int(ImString::new("Max intersection Tests").deref(), &mut self.renderer.render_settings.max_expected_intersection_tests, 100, 1000 ).build();
 
+        ui.text(ImString::new("Complexity mode:").deref());
+        ui.radio_button(ImString::new("Primary rays").deref(), &mut self.renderer.render_settings.complexity_mode, ComplexityMode::Primary);
+        ui.radio_button(ImString::new("Shadow rays").deref(), &mut self.renderer.render_settings.complexity_mode, ComplexityMode::Shadow);
+
         ui.text(ImString::new("").deref());
         ui.text(ImString::new("Acceleration structure:").deref());
         ui.radio_button(ImString::new("None (not recommended)").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Raw);
-        ui.radio_button(ImString::new("Grid").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Grid);
-        ui.radio_button(ImString::new("KDTree").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::KDTree);
+        ui.radio_button(ImString::new("Grid16").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Grid16);
+        ui.radio_button(ImString::new("Grid32").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Grid32);
+        ui.radio_button(ImString::new("Grid64").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Grid64);
+        ui.radio_button(ImString::new("KDTree8").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::KDTree8);
+        ui.radio_button(ImString::new("KDTree16").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::KDTree16);
+        ui.radio_button(ImString::new("KDTree24").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::KDTree24);
         ui.radio_button(ImString::new("BVH4").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Bvh4);
         ui.radio_button(ImString::new("BVH128").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::Bvh128);
         ui.radio_button(ImString::new("BVHSpatial4").deref(), &mut self.renderer.render_settings.mesh_intersection_setting, MeshIntersectionSetting::BvhSpatial4);

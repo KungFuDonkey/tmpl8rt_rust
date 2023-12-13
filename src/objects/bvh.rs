@@ -242,11 +242,11 @@ impl BVH
 
         bvh.subdivide(root_node_idx, 0);
 
-        println!("SAH:            {}", bvh.get_total_sah(0));
+       /* println!("SAH:            {}", bvh.get_total_sah(0));
         println!("nodes:          {}", bvh.get_node_count(0));
         println!("leafs:          {}", bvh.get_leaf_count(0));
         println!("spatial splits: {}", bvh.spatial_splits);
-        println!("SAH cost:       {}", bvh.sah_cost(0));
+        println!("SAH cost:       {}", bvh.sah_cost(0));*/
 
         return bvh;
     }
@@ -345,11 +345,11 @@ impl BVH
         bvh.subdivide(root_node_idx, prim_count);
         bvh.finalize_sbvh(0);
 
-        println!("SAH:            {}", bvh.get_total_sah(0));
+     /*   println!("SAH:            {}", bvh.get_total_sah(0));
         println!("nodes:          {}", bvh.get_node_count(0));
         println!("leafs:          {}", bvh.get_leaf_count(0));
         println!("spatial splits: {}", bvh.spatial_splits);
-        println!("SAH cost:       {}", bvh.sah_cost(0));
+        println!("SAH cost:       {}", bvh.sah_cost(0));*/
 
         return bvh;
     }

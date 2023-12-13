@@ -4,6 +4,7 @@ use crate::objects::aabb::{AABB, intersect_aabb};
 use crate::objects::bvh::*;
 use crate::objects::kd_tree::*;
 use crate::objects::grid::*;
+use crate::timer::Timer;
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum MeshIntersectionSetting
@@ -13,8 +14,12 @@ pub enum MeshIntersectionSetting
     Bvh128,
     BvhSpatial4,
     BvhSpatial128,
-    Grid,
-    KDTree
+    Grid16,
+    Grid32,
+    Grid64,
+    KDTree8,
+    KDTree16,
+    KDTree24,
 }
 
 pub struct Mesh
@@ -31,8 +36,12 @@ pub struct Mesh
     pub bvh_128: BVH,
     pub bvh_spatial_4: BVH,
     pub bvh_spatial_128: BVH,
-    pub grid: Grid,
-    pub kd_tree: KDTree,
+    pub grid_16: Grid,
+    pub grid_32: Grid,
+    pub grid_64: Grid,
+    pub kd_tree_8: KDTree,
+    pub kd_tree_16: KDTree,
+    pub kd_tree_24: KDTree,
     pub mesh_intersection_setting: MeshIntersectionSetting
 }
 
@@ -69,12 +78,48 @@ impl Mesh
 
         let bounds = Mesh::compute_bounds(&vertices);
 
+        let mut timer = Timer::new();
+        timer.reset();
+
         let bvh_4 = BVH::from_mesh(&triangles, &vertices, &bounds, 4);
+        println!("bvh_4: {}", timer.elapsed());
+        timer.reset();
+
         let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
+        println!("bvh_128: {}", timer.elapsed());
+        timer.reset();
+
         let bvh_spatial_4 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 4);
+        println!("bvh_spatial_4: {}", timer.elapsed());
+        timer.reset();
+
         let bvh_spatial_128 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 128);
-        let kd_tree = KDTree::from_mesh(&triangles, &vertices, &bounds, 12, 16, 128);
-        let grid = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
+        println!("bvh_spatial_128: {}", timer.elapsed());
+        timer.reset();
+
+        let kd_tree_8 = KDTree::from_mesh(&triangles, &vertices, &bounds, 8, 16, 128);
+        println!("kd_tree_8 {}", timer.elapsed());
+        timer.reset();
+
+        let kd_tree_16 = KDTree::from_mesh(&triangles, &vertices, &bounds, 16, 16, 128);
+        println!("kd_tree_16 {}", timer.elapsed());
+        timer.reset();
+
+        let kd_tree_24 = KDTree::from_mesh(&triangles, &vertices, &bounds, 24, 16, 128);
+        println!("kd_tree_24 {}", timer.elapsed());
+        timer.reset();
+
+        let grid_16 = Grid::from_mesh(&triangles, &vertices, &bounds, 16, 16, 16);
+        println!("grid_16 {}", timer.elapsed());
+        timer.reset();
+
+        let grid_32 = Grid::from_mesh(&triangles, &vertices, &bounds, 32, 32, 32);
+        println!("grid_32 {}", timer.elapsed());
+        timer.reset();
+
+        let grid_64 = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
+        println!("grid_64 {}", timer.elapsed());
+        timer.reset();
 
         Mesh
         {
@@ -91,8 +136,12 @@ impl Mesh
             bvh_128,
             bvh_spatial_4,
             bvh_spatial_128,
-            kd_tree,
-            grid
+            kd_tree_24,
+            kd_tree_8,
+            kd_tree_16,
+            grid_16,
+            grid_32,
+            grid_64
         }
     }
 
@@ -104,12 +153,48 @@ impl Mesh
         let triangle_normals = Mesh::compute_normals(&triangles, &vertices, &transform);
         let bounds = Mesh::compute_bounds(&vertices);
 
+        let mut timer = Timer::new();
+        timer.reset();
+
         let bvh_4 = BVH::from_mesh(&triangles, &vertices, &bounds, 4);
+        println!("bvh_4: {}", timer.elapsed());
+        timer.reset();
+
         let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
+        println!("bvh_128: {}", timer.elapsed());
+        timer.reset();
+
         let bvh_spatial_4 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 4);
+        println!("bvh_spatial_4: {}", timer.elapsed());
+        timer.reset();
+
         let bvh_spatial_128 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 128);
-        let kd_tree = KDTree::from_mesh(&triangles, &vertices, &bounds, 12, 16, 128);
-        let grid = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
+        println!("bvh_spatial_128: {}", timer.elapsed());
+        timer.reset();
+
+        let kd_tree_8 = KDTree::from_mesh(&triangles, &vertices, &bounds, 8, 16, 128);
+        println!("kd_tree_8 {}", timer.elapsed());
+        timer.reset();
+
+        let kd_tree_16 = KDTree::from_mesh(&triangles, &vertices, &bounds, 16, 16, 128);
+        println!("kd_tree_16 {}", timer.elapsed());
+        timer.reset();
+
+        let kd_tree_24 = KDTree::from_mesh(&triangles, &vertices, &bounds, 24, 16, 128);
+        println!("kd_tree_24 {}", timer.elapsed());
+        timer.reset();
+
+        let grid_16 = Grid::from_mesh(&triangles, &vertices, &bounds, 16, 16, 16);
+        println!("grid_16 {}", timer.elapsed());
+        timer.reset();
+
+        let grid_32 = Grid::from_mesh(&triangles, &vertices, &bounds, 32, 32, 32);
+        println!("grid_32 {}", timer.elapsed());
+        timer.reset();
+
+        let grid_64 = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
+        println!("grid_64 {}", timer.elapsed());
+        timer.reset();
 
         Mesh
         {
@@ -126,8 +211,12 @@ impl Mesh
             bvh_128,
             bvh_spatial_4,
             bvh_spatial_128,
-            kd_tree,
-            grid
+            kd_tree_24,
+            kd_tree_8,
+            kd_tree_16,
+            grid_16,
+            grid_32,
+            grid_64
         }
     }
 
@@ -137,12 +226,48 @@ impl Mesh
 
         let bounds = Mesh::compute_bounds(&vertices);
 
+        let mut timer = Timer::new();
+        timer.reset();
+
         let bvh_4 = BVH::from_mesh(&triangles, &vertices, &bounds, 4);
+        println!("bvh_4: {}", timer.elapsed());
+        timer.reset();
+
         let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
+        println!("bvh_128: {}", timer.elapsed());
+        timer.reset();
+
         let bvh_spatial_4 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 4);
+        println!("bvh_spatial_4: {}", timer.elapsed());
+        timer.reset();
+
         let bvh_spatial_128 = BVH::from_mesh_spatial(&triangles, &vertices, &bounds, 128);
-        let kd_tree = KDTree::from_mesh(&triangles, &vertices, &bounds, 12, 16, 128);
-        let grid = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
+        println!("bvh_spatial_128: {}", timer.elapsed());
+        timer.reset();
+
+        let kd_tree_8 = KDTree::from_mesh(&triangles, &vertices, &bounds, 8, 16, 128);
+        println!("kd_tree_8 {}", timer.elapsed());
+        timer.reset();
+
+        let kd_tree_16 = KDTree::from_mesh(&triangles, &vertices, &bounds, 16, 16, 128);
+        println!("kd_tree_16 {}", timer.elapsed());
+        timer.reset();
+
+        let kd_tree_24 = KDTree::from_mesh(&triangles, &vertices, &bounds, 24, 16, 128);
+        println!("kd_tree_24 {}", timer.elapsed());
+        timer.reset();
+
+        let grid_16 = Grid::from_mesh(&triangles, &vertices, &bounds, 16, 16, 16);
+        println!("grid_16 {}", timer.elapsed());
+        timer.reset();
+
+        let grid_32 = Grid::from_mesh(&triangles, &vertices, &bounds, 32, 32, 32);
+        println!("grid_32 {}", timer.elapsed());
+        timer.reset();
+
+        let grid_64 = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
+        println!("grid_64 {}", timer.elapsed());
+        timer.reset();
 
         Mesh
         {
@@ -159,8 +284,12 @@ impl Mesh
             bvh_128,
             bvh_spatial_4,
             bvh_spatial_128,
-            kd_tree,
-            grid
+            kd_tree_24,
+            kd_tree_8,
+            kd_tree_16,
+            grid_16,
+            grid_32,
+            grid_64
         }
     }
 
@@ -193,7 +322,7 @@ impl Mesh
 
     fn intersect_triangle(&self, ray: &mut Ray, vertex0: usize, vertex1: usize, vertex2: usize, triangle_index: usize) -> bool
     {
-        ray.intersection_tests += 1;
+        ray.triangle_intersection_tests += 1;
 
         let v0 = self.vertices[vertex0];
         let v1 = self.vertices[vertex1];
@@ -314,18 +443,35 @@ impl RayHittableObject for Mesh
             {
                 intersected = self.bvh_spatial_128.intersect(&mut ray_t);
             }
-            MeshIntersectionSetting::KDTree =>
+            MeshIntersectionSetting::KDTree24 =>
             {
-                intersected = self.kd_tree.intersect(&mut ray_t, t, &self.bounds);
+                intersected = self.kd_tree_24.intersect(&mut ray_t, t, &self.bounds);
             }
-            MeshIntersectionSetting::Grid =>
+            MeshIntersectionSetting::KDTree8 =>
             {
-                intersected = self.grid.intersect(&mut ray_t, t);
+                intersected = self.kd_tree_8.intersect(&mut ray_t, t, &self.bounds);
+            }
+            MeshIntersectionSetting::KDTree16 =>
+            {
+                intersected = self.kd_tree_16.intersect(&mut ray_t, t, &self.bounds);
+            }
+            MeshIntersectionSetting::Grid16 =>
+            {
+                intersected = self.grid_16.intersect(&mut ray_t, t);
+            }
+            MeshIntersectionSetting::Grid32 =>
+            {
+                intersected = self.grid_32.intersect(&mut ray_t, t);
+            }
+            MeshIntersectionSetting::Grid64 =>
+            {
+                intersected = self.grid_64.intersect(&mut ray_t, t);
             }
         }
 
 
         ray.intersection_tests += ray_t.intersection_tests;
+        ray.triangle_intersection_tests += ray_t.triangle_intersection_tests;
         if intersected
         {
             ray.t = ray_t.t;
@@ -344,11 +490,13 @@ impl RayHittableObject for Mesh
         Float2::zero()
     }
 
-    fn is_occluded(&self, ray: &Ray) -> bool {
+    fn is_occluded(&self, ray: &mut Ray) -> bool {
         let mut shadow = ray.clone();
         shadow.t = 1e34;
         shadow.obj_idx = usize::MAX;
         self.intersect(&mut shadow);
+        ray.intersection_tests += shadow.intersection_tests;
+        ray.triangle_intersection_tests += shadow.triangle_intersection_tests;
         return shadow.obj_idx != usize::MAX;
     }
 }

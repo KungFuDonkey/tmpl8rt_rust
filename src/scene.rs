@@ -60,7 +60,7 @@ impl Scene
         let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 1.0)) * Mat4::scale(0.5);
         meshes.push(Mesh::from_tri_file(0, 8, transform, std::path::Path::new("./assets/unity.tri")));
 
-        let transform = Mat4::translate( &Float3::from_xyz(1.0, 0.0, 0.5)) * Mat4::scale(0.5);
+        /*let transform = Mat4::translate( &Float3::from_xyz(1.0, 0.0, 0.5)) * Mat4::scale(0.5);
         let (msh, mts) = load_obj(&std::path::Path::new("./assets/suzanne.obj"), meshes.len(), materials.len(), &transform);
 
         for mesh in msh
@@ -71,7 +71,7 @@ impl Scene
         for material in mts
         {
             materials.push(material);
-        }
+        }*/
 
         let mut scene = Scene{
             spheres: vec![
@@ -83,7 +83,7 @@ impl Scene
                 Plane::new(1, 5, Float3::from_xyz(-1.0, 0.0, 0.0), 2.99, PlaneUVFunction::zy()),
                 Plane::new(2, 2, Float3::from_xyz(0.0, 1.0, 0.0), 1.0, PlaneUVFunction::xz()),
                 Plane::new(3, 1, Float3::from_xyz(0.0, -1.0, 0.0), 2.0, PlaneUVFunction::empty()),
-                Plane::new(4, 1, Float3::from_xyz(0.0, 0.0, 1.0), 3.0, PlaneUVFunction::empty()),
+                Plane::new(4, 1, Float3::from_xyz(0.0, 0.0, 1.0), 8.0, PlaneUVFunction::empty()),
                 Plane::new(5, 3, Float3::from_xyz(0.0, 0.0, -1.0), 3.99, PlaneUVFunction::xy()),
             ],
             cubes: vec![
@@ -155,7 +155,7 @@ impl Scene
         }
     }
 
-    pub fn is_occluded(&self, ray: &Ray) -> bool
+    pub fn is_occluded(&self, ray: &mut Ray) -> bool
     {
         for sphere in &self.spheres
         {
@@ -214,12 +214,13 @@ impl Scene
         }
     }
 
-    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, sample_size: usize, seed: &mut u32) -> Float3
+    pub fn direct_lighting_soft(&self, point: &Float3, normal: &Float3, sample_size: usize, seed: &mut u32) -> (Float3, u32, u32)
     {
         let total_sample_points = sample_size;
         let sample_strength = 1.0 / (total_sample_points as f32);
         let mut lighting = Float3::zero();
-
+        let mut traversal_steps: u32 = 0;
+        let mut triangle_tests: u32 = 0;
         for _ in 0..sample_size
         {
             let quad_index = random_uint_s(seed) % (self.quads.len() as u32);
@@ -228,9 +229,12 @@ impl Scene
             let ray_dir = light_point - *point;
             let ray_dir_n = normalize(&ray_dir);
             let origin = (*point) + (EPSILON * ray_dir_n);
-            let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
+            let mut ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
 
-            if self.is_occluded(&ray)
+            let is_occluded = self.is_occluded(&mut ray);
+            traversal_steps += ray.intersection_tests;
+            triangle_tests += ray.triangle_intersection_tests;
+            if is_occluded
             {
                 continue;
             }
@@ -240,23 +244,28 @@ impl Scene
             lighting += sample_strength * dot(&ray_dir_n, &normal) * light_color;
         }
 
-        return lighting;
+        return (lighting, traversal_steps, triangle_tests);
     }
 
-    pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3) -> Float3
+    pub fn direct_lighting_hard(&self, point: &Float3, normal: &Float3) -> (Float3, u32, u32)
     {
         let total_sample_points = self.quads.len() as u32;
         let light_strength = 1.0 / (total_sample_points as f32);
         let mut lighting = Float3::zero();
+        let mut traversal_steps: u32 = 0;
+        let mut triangle_tests: u32 = 0;
         for quad in &self.quads
         {
             let light_point = quad.center_point();
             let ray_dir = light_point - *point;
             let ray_dir_n = normalize(&ray_dir);
             let origin = (*point) + (EPSILON * ray_dir_n);
-            let ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
+            let mut ray = Ray::directed_distance(origin, ray_dir_n, length(&ray_dir) - (2.0 * EPSILON));
 
-            if self.is_occluded(&ray)
+            let is_occluded = self.is_occluded(&mut ray);
+            traversal_steps += ray.intersection_tests;
+            triangle_tests += ray.triangle_intersection_tests;
+            if is_occluded
             {
                 continue;
             }
@@ -267,7 +276,7 @@ impl Scene
             lighting += light_strength * dot(&ray_dir_n, &normal) * light_color;
         }
 
-        return lighting;
+        return (lighting, traversal_steps, triangle_tests);
     }
 
 

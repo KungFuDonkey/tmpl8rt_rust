@@ -240,6 +240,7 @@ impl KDTree
                 {
                     continue;
                 }
+                mailbox.set_true(id);
                 let triangle = &self.triangles[id].internal_triangle;
                 intersected = intersect_triangle(triangle, ray) || intersected;
             }

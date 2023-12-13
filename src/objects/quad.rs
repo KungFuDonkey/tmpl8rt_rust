@@ -97,7 +97,8 @@ impl RayHittableObject for Quad
         Float2::zero()
     }
 
-    fn is_occluded(&self, ray: &Ray) -> bool {
+    fn is_occluded(&self, ray: &mut Ray) -> bool {
+        ray.intersection_tests += 1;
         let o_y: f32 = self.inv_t.cell[4] * ray.origin.x + self.inv_t.cell[5] * ray.origin.y + self.inv_t.cell[6] * ray.origin.z + self.inv_t.cell[7];
         let d_y: f32 = self.inv_t.cell[4] * ray.direction.x + self.inv_t.cell[5] * ray.direction.y + self.inv_t.cell[6] * ray.direction.z;
         let t = o_y / -d_y;

@@ -79,7 +79,7 @@ impl RayHittableObject for Plane
         return (self.uv_function.f)(i)
     }
 
-    fn is_occluded(&self, _: &Ray) -> bool {
+    fn is_occluded(&self, _: &mut Ray) -> bool {
         return false;
     }
 }

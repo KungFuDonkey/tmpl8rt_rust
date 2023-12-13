@@ -22,7 +22,8 @@ pub struct Ray {
     pub obj_idx: usize,
     pub sub_obj_idx: usize,
     pub obj_type: RayHittableObjectType,
-    pub intersection_tests: u32
+    pub intersection_tests: u32,
+    pub triangle_intersection_tests: u32,
 }
 
 impl Ray {
@@ -38,7 +39,8 @@ impl Ray {
             obj_idx: usize::MAX,
             sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
-            intersection_tests: 0
+            intersection_tests: 0,
+            triangle_intersection_tests: 0
         }
     }
 
@@ -52,7 +54,8 @@ impl Ray {
             obj_idx: usize::MAX,
             sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
-            intersection_tests: 0
+            intersection_tests: 0,
+            triangle_intersection_tests: 0
         }
     }
 
@@ -67,7 +70,8 @@ impl Ray {
             obj_idx: usize::MAX,
             sub_obj_idx: 0,
             obj_type: RayHittableObjectType::None,
-            intersection_tests: 0
+            intersection_tests: 0,
+            triangle_intersection_tests: 0
         }
     }
 
@@ -85,7 +89,7 @@ pub trait RayHittableObject
 
     fn get_uv(&self, i: &Float3) -> Float2;
 
-    fn is_occluded(&self, ray: &Ray) -> bool;
+    fn is_occluded(&self, ray: &mut Ray) -> bool;
 }
 
 pub trait RayOccluder

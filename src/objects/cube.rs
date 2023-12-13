@@ -109,7 +109,8 @@ impl RayHittableObject for Cube
         Float2::zero()
     }
 
-    fn is_occluded(&self, ray: &Ray) -> bool {
+    fn is_occluded(&self, ray: &mut Ray) -> bool {
+        ray.intersection_tests += 1;
         let origin = transform_position(&ray.origin, &self.inv_m);
         let direction = transform_vector(&ray.direction, &self.inv_m);
         let rdx = 1.0 / direction.x;

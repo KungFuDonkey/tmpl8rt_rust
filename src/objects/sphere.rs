@@ -60,7 +60,8 @@ impl RayHittableObject for Sphere
         Float2::zero()
     }
 
-    fn is_occluded(&self, ray: &Ray) -> bool {
+    fn is_occluded(&self, ray: &mut Ray) -> bool {
+        ray.intersection_tests += 1;
         let oc = ray.origin - self.position;
         let b = dot(&oc, &ray.direction);
         let c = dot(&oc, &oc) - self.radius2;

@@ -13,7 +13,7 @@ pub struct Triangle
 
 pub fn intersect_triangle(triangle: &Triangle, ray: &mut Ray) -> bool
 {
-    ray.intersection_tests += 1;
+    ray.triangle_intersection_tests += 1;
 
     let edge1 = triangle.vertex1 - triangle.vertex0;
     let edge2 = triangle.vertex2 - triangle.vertex0;

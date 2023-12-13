@@ -24,6 +24,12 @@ pub enum LightingMode
     SoftShadows,
     HardShadows
 }
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum ComplexityMode
+{
+    Primary,
+    Shadow
+}
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub struct RenderSettings
@@ -34,8 +40,16 @@ pub struct RenderSettings
     pub area_sample_size: i32,
     pub mesh_intersection_setting: MeshIntersectionSetting,
     pub max_expected_intersection_tests: i32,
+    pub complexity_mode: ComplexityMode
 }
 
+pub struct RayInfo
+{
+    pub primary_ray_steps: u32,
+    pub primary_ray_triangle_tests: u32,
+    pub shadow_ray_steps: u32,
+    pub shadow_triangle_tests: u32,
+}
 
 pub struct Renderer
 {
@@ -46,6 +60,9 @@ pub struct Renderer
     pub prev_render_settings: RenderSettings,
     seed: u32,
     accumulated_pixels: u32,
+    pub complexity_max: u32,
+    pub complexity_min: u32,
+    pub avg_complexity: f32,
 }
 
 
@@ -61,8 +78,9 @@ impl Renderer
             render_mode: RenderMode::Complexity,
             lighting_mode: LightingMode::None,
             area_sample_size: 1,
-            mesh_intersection_setting: MeshIntersectionSetting::Grid,
-            max_expected_intersection_tests: 1000
+            mesh_intersection_setting: MeshIntersectionSetting::Grid64,
+            max_expected_intersection_tests: 1000,
+            complexity_mode: ComplexityMode::Primary
         };
 
         Renderer{
@@ -73,6 +91,9 @@ impl Renderer
             prev_render_settings: render_settings,
             seed,
             accumulated_pixels: 0,
+            complexity_max: 0,
+            complexity_min: 0,
+            avg_complexity: 0.0
         }
     }
 
@@ -106,29 +127,39 @@ impl Renderer
         return ray.intersection_tests;
     }
 
-    fn get_lighting_color(ray: &Ray, scene: &Scene, intersection: &Float3, material: &Material, render_settings: &RenderSettings, seed: &mut u32) -> Float3
+    fn get_lighting_color(ray: &Ray, scene: &Scene, intersection: &Float3, material: &Material, render_settings: &RenderSettings, seed: &mut u32) -> (Float3, u32, u32)
     {
-        let lighting: Float3 = match render_settings.lighting_mode {
-            LightingMode::None => Float3::from_a(1.0),
+        let (lighting, intersection_tests, triangle_intersections): (Float3, u32, u32) = match render_settings.lighting_mode {
+            LightingMode::None => (Float3::from_a(1.0), 0, 0),
             LightingMode::HardShadows => scene.direct_lighting_hard(&intersection, &scene.get_normal(ray, &intersection, &ray.direction)),
             LightingMode::SoftShadows => scene.direct_lighting_soft(&intersection, &scene.get_normal(ray, &intersection, &ray.direction), render_settings.area_sample_size as usize, seed)
         };
-        return lighting * Self::get_color_from_material(ray, scene, &intersection, material);
+        return (lighting * Self::get_color_from_material(ray, scene, &intersection, material), intersection_tests, triangle_intersections);
     }
 
-    fn trace(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings, seed: &mut u32, bounces: i32) -> Float3
+    fn trace(ray: &mut Ray, scene: &Scene, render_settings: &RenderSettings, seed: &mut u32, bounces: i32) -> (Float3, RayInfo)
     {
         scene.intersect_scene(ray);
+        let mut ray_info = RayInfo
+        {
+            primary_ray_steps: ray.intersection_tests,
+            primary_ray_triangle_tests: ray.triangle_intersection_tests,
+            shadow_ray_steps: 0,
+            shadow_triangle_tests: 0
+        };
         if ray.obj_idx == usize::MAX
         {
-            return Float3::zero();
+            return (Float3::zero(), ray_info);
         }
         let intersection = ray.intersection_point();
         let material = scene.get_material(ray);
 
         if bounces > render_settings.max_bounces
         {
-            return Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);
+            let (color, traversal_steps, triangle_intersections) = Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);
+            ray_info.shadow_ray_steps = traversal_steps;
+            ray_info.shadow_triangle_tests = triangle_intersections;
+            return (color, ray_info);
         }
 
         match material
@@ -139,8 +170,11 @@ impl Renderer
                 let reflected_ray_direction = reflect(&ray.direction, &normal);
                 let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
                 let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, reflection_material);
-                let object_color = Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);
-                return (material_color) * (*reflectivity * Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1) + (1.0 - reflectivity) * object_color);
+                let (object_color, traversal_steps, triangle_intersections) = Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);
+                ray_info.shadow_ray_steps = traversal_steps;
+                ray_info.shadow_triangle_tests = triangle_intersections;
+                let (reflection_color, _) = Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
+                return ((material_color) * (*reflectivity * reflection_color + (1.0 - reflectivity) * object_color), ray_info);
             }
             Material::FullyReflectiveMaterial(reflection_material) =>
             {
@@ -148,11 +182,15 @@ impl Renderer
                 let reflected_ray_direction = reflect(&ray.direction, &normal);
                 let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
                 let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, reflection_material);
-                return (material_color) * Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
+
+                let (reflection_color, _) = Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
+
+                return ((material_color) * reflection_color, ray_info);
             }
             Material::RefractiveMaterialWithExit(refractive_material, n2, absorption) =>
             {
-                // currently broken
+                // currently broken when inside object
+
                 // assumes no collisions with any other objects, so a full glass ball with no objects inside
 
                 let normal = scene.get_normal(ray, &intersection, &ray.direction);
@@ -166,11 +204,7 @@ impl Renderer
 
                 if k < 0.0
                 {
-                    let normal = scene.get_normal(ray, &intersection, &ray.direction);
-                    let reflected_ray_direction = reflect(&ray.direction, &normal);
-                    let mut new_ray = Ray::directed(intersection + reflected_ray_direction * EPSILON, reflected_ray_direction);
-                    let material_color = Self::get_color_from_simple_material(ray, scene, &intersection, refractive_material);
-                    return (material_color) * Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
+                    // do reflection
                 }
 
                 let refract_direction = (n1n2 * ray.direction) + (normal * (n1n2 * theta1_2 - k.sqrt()));
@@ -182,7 +216,7 @@ impl Renderer
                 if refract_ray.obj_idx == usize::MAX
                 {
                     println!("no int");
-                    return Float3::zero();
+                    return (Float3::zero(), ray_info);
                 }
                 let refract_normal = scene.get_normal(&refract_ray, &intersection, &refract_direction);
                 let reversed_refract_dir = -refract_direction;
@@ -202,11 +236,16 @@ impl Renderer
 
                 let absorption_vector = Float3::from_xyz((-material_color.x * refract_ray.t * absorption).exp(), (-material_color.y * refract_ray.t * absorption).exp(), (-material_color.z * refract_ray.t * absorption).exp());
 
-                return (absorption_vector) * Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
+                let (refraction_color, _) = Renderer::trace(&mut new_ray, scene, render_settings, seed, bounces + 1);
+
+                return ((absorption_vector) * refraction_color, ray_info);
             }
             _ =>
             {
-                return Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);
+                let (color, traversal_steps, triangle_intersections) = Renderer::get_lighting_color(ray, scene, &intersection, material, render_settings, seed);
+                ray_info.shadow_ray_steps = traversal_steps;
+                ray_info.shadow_triangle_tests = triangle_intersections;
+                return (color, ray_info);
             }
         }
     }
@@ -232,7 +271,8 @@ impl Renderer
                 {
                     let mut seed = self.random_seeds[index];
                     let mut ray = camera.get_primary_ray_indexed(index);
-                    *value += Renderer::trace(&mut ray, &scene, &self.render_settings, &mut seed, 1);
+                    let (color, _) = Renderer::trace(&mut ray, &scene, &self.render_settings, &mut seed, 1);
+                    *value += color;
                 });
 
                 self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
@@ -261,9 +301,24 @@ impl Renderer
             {
                 self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
                 {
+                    let mut seed = self.random_seeds[index];
                     let mut ray = camera.get_primary_ray_indexed(index);
-                    *value = Renderer::render_complexity(&mut ray, &scene, &self.render_settings);
+                    let (_, info) = Renderer::trace(&mut ray, &scene, &self.render_settings, &mut seed, 1);
+                    if self.render_settings.complexity_mode == ComplexityMode::Primary
+                    {
+                        *value = info.primary_ray_triangle_tests + info.primary_ray_steps;
+                        return;
+                    }
+                    if self.render_settings.complexity_mode == ComplexityMode::Shadow
+                    {
+                        *value = info.shadow_triangle_tests + info.shadow_ray_steps;
+                        return;
+                    }
                 });
+
+                self.complexity_max = *self.render_target.pixels.par_iter().max().unwrap();
+                self.complexity_min = *self.render_target.pixels.par_iter().min().unwrap();
+                self.avg_complexity = (self.render_target.pixels.par_iter().sum::<u32>() as f32) / ((SCRWIDTH * SCRHEIGHT) as f32);
 
                 let max = self.render_settings.max_expected_intersection_tests;
 
@@ -286,11 +341,27 @@ impl Renderer
             {
                 self.render_target.pixels.par_iter_mut().enumerate().for_each(|(index, value)|
                 {
+                    let mut seed = self.random_seeds[index];
                     let mut ray = camera.get_primary_ray_indexed(index);
-                    *value = Renderer::render_complexity(&mut ray, &scene, &self.render_settings);
+                    let (_, info) = Renderer::trace(&mut ray, &scene, &self.render_settings, &mut seed, 1);
+
+                    *value = info.primary_ray_steps;
+                    if self.render_settings.complexity_mode == ComplexityMode::Primary
+                    {
+                        *value = info.primary_ray_triangle_tests + info.primary_ray_steps;
+                        return;
+                    }
+                    if self.render_settings.complexity_mode == ComplexityMode::Shadow
+                    {
+                        *value = info.shadow_triangle_tests + info.shadow_ray_steps;
+                        return;
+                    }
                 });
 
                 let max = *self.render_target.pixels.par_iter().max().unwrap();
+                self.complexity_max = max;
+                self.complexity_min = *self.render_target.pixels.par_iter().min().unwrap();
+                self.avg_complexity = (self.render_target.pixels.par_iter().sum::<u32>() as f32) / ((SCRWIDTH * SCRHEIGHT) as f32);
 
                 self.render_target.pixels.par_iter_mut().for_each(|value|
                 {
@@ -337,5 +408,82 @@ impl Renderer
             *value = Float3::zero();
         });
         self.accumulated_pixels = 0;
+    }
+
+    pub fn export_frame(&self, delta_time: f32)
+    {
+        let intersection_name = match self.render_settings.mesh_intersection_setting
+        {
+            MeshIntersectionSetting::Raw => "Raw",
+            MeshIntersectionSetting::Bvh4 => "BVH4",
+            MeshIntersectionSetting::Bvh128 => "BVH128",
+            MeshIntersectionSetting::BvhSpatial4 => "BVHSpatial4",
+            MeshIntersectionSetting::BvhSpatial128 => "BVHSpatial128",
+            MeshIntersectionSetting::Grid16 => "Grid16",
+            MeshIntersectionSetting::Grid32 => "Grid32",
+            MeshIntersectionSetting::Grid64 => "Grid64",
+            MeshIntersectionSetting::KDTree24 => "KDTree24",
+            MeshIntersectionSetting::KDTree8 => "KDTree8",
+            MeshIntersectionSetting::KDTree16 => "KDTree16",
+        };
+
+        let mut complexity_mode = "";
+
+        if self.render_settings.render_mode == RenderMode::Complexity || self.render_settings.render_mode == RenderMode::RelativeComplexity
+        {
+            complexity_mode = match self.render_settings.complexity_mode
+            {
+                ComplexityMode::Primary => "_Primary",
+                ComplexityMode::Shadow => "_Shadow"
+            };
+        }
+
+        let mut complexity_value: String = String::new();
+        if self.render_settings.render_mode == RenderMode::Complexity
+        {
+            complexity_value = self.render_settings.max_expected_intersection_tests.to_string();
+        }
+
+        let render_mode = match self.render_settings.render_mode
+        {
+            RenderMode::Standard => "Standard",
+            RenderMode::Complexity => "Complexity",
+            RenderMode::RelativeComplexity => "Relative_Complexity",
+            RenderMode::Distance => "Distance",
+            RenderMode::Normals => "Normals"
+        };
+
+        let lighting_mode = match self.render_settings.lighting_mode {
+            LightingMode::None => "None",
+            LightingMode::HardShadows => "Hard",
+            LightingMode::SoftShadows => "Soft"
+        };
+
+        let mut name = String::from("./output/");
+        name += intersection_name;
+        name += "_";
+        name += render_mode;
+        name += complexity_value.as_str();
+        name += complexity_mode;
+        name += "_";
+        name += lighting_mode;
+        name += "_";
+        name += delta_time.to_string().as_str();
+        name += ".png";
+
+        let mut img = image::RgbaImage::new(SCRWIDTH as u32, SCRHEIGHT as u32);
+
+        img.pixels_mut().enumerate().for_each(|(index, pixel)|{
+            let value = self.render_target.pixels[index];
+            let r = value >> 16;
+            let g = (value & 0x0000ff00) >> 8;
+            let b = value & 0x000000ff;
+            pixel[0] = r as u8;
+            pixel[1] = g as u8;
+            pixel[2] = b as u8;
+            pixel[3] = 255;
+        });
+
+        img.save(name).expect("Failed to save file to disk");
     }
 }
