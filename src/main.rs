@@ -27,10 +27,12 @@ use imgui_glfw_rs::glfw::*;
 use imgui_glfw_rs::imgui;
 use imgui_glfw_rs::ImguiGLFW;
 use input::Input;
-use crate::opencl::{get_cl_platform_info, OpenCL};
+use crate::opencl::{get_cl_platform_info, OpenCL, OpenCLKernel, OpenCLProgram};
 
 fn main() {
     let mut cl = OpenCL::init();
+    let mut cl_program = OpenCLProgram::from_file(&cl, std::path::Path::new("./src/kernels/spheres.cl"));
+    let mut cl_kernel = OpenCLKernel::from_program(&cl, &cl_program, "intersect_spheres_kernel");
 
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
 

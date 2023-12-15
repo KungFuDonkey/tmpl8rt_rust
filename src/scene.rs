@@ -1,7 +1,6 @@
 use std::f32::consts::PI;
 use crate::math::*;
 use crate::material::*;
-use crate::obj_loader::load_obj;
 use crate::ray::*;
 use crate::objects::sphere::*;
 use crate::objects::plane::*;
@@ -9,9 +8,6 @@ use crate::objects::cube::*;
 use crate::objects::torus::*;
 use crate::objects::quad::*;
 use crate::objects::mesh::*;
-use crate::objects::bvh::*;
-use crate::objects::grid::*;
-use crate::objects::kd_tree::*;
 
 pub struct Scene
 {
@@ -21,12 +17,6 @@ pub struct Scene
     tori: Vec<Torus>,
     quads: Vec<Quad>,
     meshes: Vec<Mesh>,
-    bvh_4: Vec<BVH>,
-    bvh_128: Vec<BVH>,
-    bvh_spatial_4: Vec<BVH>,
-    bvh_spatial_128: Vec<BVH>,
-    grids: Vec<Grid>,
-    kd_trees: Vec<KDTree>,
     materials: Vec<Material>,
     animation_time: f32,
 }
@@ -99,12 +89,6 @@ impl Scene
                 Quad::new(3, 0, 0.5, &Mat4::translate(&Float3::from_xyz(-1.0, 1.5, 1.0))),
             ],
             meshes,
-            bvh_4: Vec::new(),
-            bvh_spatial_4: Vec::new(),
-            bvh_128: Vec::new(),
-            bvh_spatial_128: Vec::new(),
-            grids: Vec::new(),
-            kd_trees: Vec::new(),
             materials,
             animation_time: 0.0
         };

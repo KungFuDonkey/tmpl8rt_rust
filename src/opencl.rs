@@ -113,6 +113,7 @@ pub fn get_cl_platform_info() -> Result<(), cl_int> {
     Ok(())
 }
 
+#[derive(PartialEq)]
 pub enum OpenCLVendor
 {
     Nvidia,
@@ -121,6 +122,7 @@ pub enum OpenCLVendor
     Other
 }
 
+#[derive(PartialEq)]
 pub enum OpenCLArch
 {
     Ampere,
@@ -399,18 +401,17 @@ impl Drop for OpenCL
     }
 }
 
-pub struct Kernel
+pub struct OpenCLProgram
 {
-    kernel: cl_kernel,
-    program: cl_program,
+    program: cl_program
 }
 
-impl Kernel
+impl OpenCLProgram
 {
-    fn from_file(cl: &OpenCL, file_path: &std::path::Path, entry_point: &str) -> Self
+    pub fn from_file(cl: &OpenCL, file_path: &std::path::Path) -> Self
     {
         let text = std::fs::read_to_string(file_path)
-            .expect(format!("Failed to read file at {file_path}").as_str());
+            .expect(format!("Failed to read file at {}", file_path.to_str().unwrap()).as_str());
 
         let mut vendor_lines = String::new();
         if cl.device.vendor == OpenCLVendor::Nvidia
@@ -453,25 +454,40 @@ impl Kernel
         match cl3::program::build_program(program,&[cl.device.device_id], options.as_c_str(), None, null_mut())
         {
             Err(_) =>
-            {
-                let build_info = String::from(get_program_build_info(program, cl.device.device_id, CL_PROGRAM_BUILD_LOG)
-                    .expect("Failed to get build info"));
+                {
+                    let build_info = String::from(get_program_build_info(program, cl.device.device_id, CL_PROGRAM_BUILD_LOG)
+                        .expect("Failed to get build info"));
 
-                println!("{}", build_info);
-                panic!("Failed to build");
-            }
+                    println!("{}", build_info);
+                    panic!("Failed to build");
+                }
             _ => {}
         }
 
+        OpenCLProgram
+        {
+            program
+        }
+    }
+}
+
+pub struct OpenCLKernel
+{
+    kernel: cl_kernel
+}
+
+impl OpenCLKernel
+{
+    pub fn from_program(cl: &OpenCL, program: &OpenCLProgram, entry_point: &str) -> Self
+    {
         let entry_point = CString::new(entry_point)
             .expect("Failed to convert entry point");
 
-        let kernel = create_kernel(program, entry_point.as_c_str())
+        let kernel = create_kernel(program.program, entry_point.as_c_str())
             .expect("Failed to create kernel");
 
-        Kernel
+        OpenCLKernel
         {
-            program,
             kernel
         }
     }
