@@ -88,6 +88,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75476fe966a8af7c0ceae2a3e514afa87d4451741fcdfab8bfaa07ad301842ec"
 
 [[package]]
+name = "cl3"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96fd7abe572cee1c781e3464d5c468e8aee10caaef3ea911aea0dea16414409d"
+dependencies = [
+ "libc",
+ "opencl-sys",
+ "thiserror",
+]
+
+[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -568,6 +579,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
+name = "opencl-sys"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e45b6878f1873ce3fba231eab49c0da9505a6241fed9cb390a16ed8e101ab0c4"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -796,6 +816,7 @@ dependencies = [
 name = "raytracer"
 version = "0.1.0"
 dependencies = [
+ "cl3",
  "fast-math",
  "gl",
  "glfw 0.44.0",
@@ -899,6 +920,26 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "thiserror"
+version = "1.0.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9a7210f5c9a7156bb50aa36aed4c95afb51df0df00713949448cf9e97d382d2"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "266b2e40bc00e5a6c09c3584011e08b06f123c00362c92b975ba9843aaaa14b8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

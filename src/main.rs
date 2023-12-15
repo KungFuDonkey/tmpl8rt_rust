@@ -1,4 +1,7 @@
 use std::ffi::CString;
+
+extern crate cl3;
+
 mod camera;
 mod math;
 mod scene;
@@ -13,6 +16,7 @@ mod ray;
 mod objects;
 mod obj_loader;
 mod bitvec;
+mod opencl;
 
 use surface::*;
 use crate::opengl::{draw_quad, GLTexture, Shader, TextureType};
@@ -23,8 +27,11 @@ use imgui_glfw_rs::glfw::*;
 use imgui_glfw_rs::imgui;
 use imgui_glfw_rs::ImguiGLFW;
 use input::Input;
+use crate::opencl::{get_cl_platform_info, OpenCL};
 
 fn main() {
+    let mut cl = OpenCL::init();
+
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
 
 
