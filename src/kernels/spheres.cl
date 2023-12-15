@@ -32,7 +32,7 @@ bool intersect_sphere(float* ray_t, float3* ray_origin, float3* ray_direction, f
     return false;
 }
 
-void intersect_spheres(float* ray_t, float3* ray_origin, float3* ray_direction, uint* ray_obj_id, uint* ray_obj_type, uint num_spheres, float3* sphere_positions, float* sphere_radi2, int* sphere_obj_ids)
+void intersect_spheres(float* ray_t, float3* ray_origin, float3* ray_direction, uint* ray_obj_id, uint* ray_obj_type, uint num_spheres, float3* sphere_positions, float* sphere_radi2)
 {
     for (uint i = 0; i < num_spheres; i++)
     {
@@ -44,40 +44,7 @@ void intersect_spheres(float* ray_t, float3* ray_origin, float3* ray_direction, 
             continue;
         }
 
-        *ray_obj_id = sphere_obj_ids[i];
+        *ray_obj_id = i;
         *ray_obj_type = 0; // sphere
     }
-}
-
-__kernel void intersect_spheres_kernel(
-    uint num_rays,
-    __global float* ts,
-    __global float3* origins,
-    __global float3* directions,
-    __global uint* obj_ids,
-    __global uint* obj_types,
-    uint num_spheres,
-    __global float3* sphere_positions,
-    __global float* sphere_radi2,
-    __global uint* sphere_obj_ids)
-{
-    int idx = get_global_id(0);
-    if (idx >= num_rays)
-    {
-        return;
-    }
-
-    float ray_t = ts[idx];
-    float3 ray_origin = origins[idx];
-    float3 ray_direction = directions[idx];
-    uint ray_obj_id = obj_ids[idx];
-    uint ray_obj_type = obj_types[idx];
-
-    intersect_spheres(&ray_t, &ray_origin, &ray_direction, &ray_obj_id, &ray_obj_type, num_spheres, sphere_positions, sphere_radi2, sphere_obj_ids);
-
-    ts[idx] = ray_t;
-    origins[idx] = ray_origin;
-    directions[idx] = ray_direction;
-    obj_ids[idx] = ray_obj_id;
-    obj_types[idx] = ray_obj_type;
 }

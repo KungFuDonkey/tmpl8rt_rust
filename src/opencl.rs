@@ -138,6 +138,7 @@ pub struct OpenCLDevice
     architecture: OpenCLArch
 }
 
+
 pub struct OpenCL
 {
     platform: cl_platform_id,
@@ -490,6 +491,46 @@ impl OpenCLKernel
         {
             kernel
         }
+    }
+}
+
+pub struct OpenCLBuffer<T>
+{
+    host_buffer: Vec<T>,
+    buffer: cl_mem
+}
+
+impl<T: Clone> OpenCLBuffer<T>
+{
+    fn create_buffer(cl: &OpenCL, host_data: Vec<T>, flags: cl_mem_flags) -> Self
+    {
+        let mut host_buffer = host_data.clone();
+        unsafe
+        {
+            let buffer = create_buffer(cl.context, flags, host_data.len(), host_buffer.as_mut_ptr() as *mut c_void)
+                .expect("Failed to create buffer");
+
+            return OpenCLBuffer
+            {
+                host_buffer,
+                buffer
+            }
+        }
+    }
+
+    pub fn read_write(cl: &OpenCL, host_data: Vec<T>) -> Self
+    {
+        return OpenCLBuffer::create_buffer(cl, host_data, CL_MEM_READ_WRITE);
+    }
+
+    pub fn read_only(cl: &OpenCL, host_data: Vec<T>) -> Self
+    {
+        return OpenCLBuffer::create_buffer(cl, host_data, CL_MEM_READ_ONLY);
+    }
+
+    pub fn write_only(cl: &OpenCL, host_data: Vec<T>) -> Self
+    {
+        return OpenCLBuffer::create_buffer(cl, host_data, CL_MEM_WRITE_ONLY);
     }
 }
 

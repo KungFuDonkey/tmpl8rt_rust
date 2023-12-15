@@ -4,14 +4,18 @@ use crate::scene::{Scene};
 use crate::timer::{FrameTimer,Timer};
 use imgui_glfw_rs::imgui::Ui;
 use imgui_glfw_rs::imgui::ImString;
+use crate::gpu_renderer::GPURenderer;
 use crate::input::Input;
 use crate::renderer::{ComplexityMode, LightingMode, Renderer, RenderMode};
 use crate::objects::mesh::MeshIntersectionSetting;
+use crate::opencl::OpenCL;
 
 
 pub struct Application
 {
     pub renderer: Renderer,
+    pub gpu_renderer: GPURenderer,
+    cl: OpenCL,
     camera: Camera,
     scene: Scene,
     is_animating: bool,
@@ -30,13 +34,17 @@ impl Application
 {
     pub fn new() -> Self
     {
-
         let renderer = Renderer::new();
         let mut scene = Scene::new();
         scene.change_intersection_setting(&renderer.render_settings.mesh_intersection_setting);
 
+        let cl = OpenCL::init();
+        let gpu_renderer =  GPURenderer::new(&cl);
+
         Application {
             renderer,
+            cl,
+            gpu_renderer,
             camera: Camera::new(),
             scene,
             is_animating: false,

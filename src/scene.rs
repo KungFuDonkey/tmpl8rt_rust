@@ -8,6 +8,7 @@ use crate::objects::cube::*;
 use crate::objects::torus::*;
 use crate::objects::quad::*;
 use crate::objects::mesh::*;
+use crate::opencl::{OpenCL, OpenCLBuffer};
 
 pub struct Scene
 {
@@ -100,10 +101,10 @@ impl Scene
 
     pub fn change_intersection_setting(&mut self, mesh_setting: &MeshIntersectionSetting)
     {
-        for mesh in &mut self.meshes
+        /*for mesh in &mut self.meshes
         {
             mesh.mesh_intersection_setting = *mesh_setting;
-        }
+        }*/
     }
 
     pub fn intersect_scene(&self, ray: &mut Ray)
@@ -440,5 +441,41 @@ impl Scene
         let modulo2 = modulo * modulo;
         let tm = 1.0 - modulo2;
         self.spheres[0].position = Float3::from_xyz(-1.8, -0.4 * tm, 2.0);
+    }
+}
+
+struct GPUScene
+{
+    sphere_positions: OpenCLBuffer<Float3>,
+    sphere_radi2: OpenCLBuffer<f32>,
+}
+
+impl GPUScene
+{
+    pub fn new(cl: &OpenCL) -> Self
+    {
+        let scene = Scene::new();
+
+        return GPUScene::from_scene(cl, &scene);
+    }
+
+    pub fn from_scene(cl: &OpenCL, scene: &Scene) -> Self
+    {
+        let mut sphere_positions: Vec<Float3> = Vec::with_capacity(scene.spheres.len());
+        let mut sphere_radi2: Vec<f32> = Vec::with_capacity(scene.spheres.len());
+        for sphere in &scene.spheres
+        {
+            sphere_positions.push(sphere.position);
+            sphere_radi2.push(sphere.radius2);
+        }
+
+        let sphere_positions = OpenCLBuffer::read_only(cl, sphere_positions);
+        let sphere_radi2 = OpenCLBuffer::read_only(cl, sphere_radi2);
+
+        GPUScene
+        {
+            sphere_positions,
+            sphere_radi2
+        }
     }
 }

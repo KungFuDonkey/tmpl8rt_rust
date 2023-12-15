@@ -33,7 +33,7 @@ pub struct Mesh
     pub inv_t: Mat4,
     pub bounds: AABB,
     pub bvh_4: BVH,
-    pub bvh_128: BVH,
+/*    pub bvh_128: BVH,
     pub bvh_spatial_4: BVH,
     pub bvh_spatial_128: BVH,
     pub grid_16: Grid,
@@ -42,7 +42,7 @@ pub struct Mesh
     pub kd_tree_8: KDTree,
     pub kd_tree_16: KDTree,
     pub kd_tree_24: KDTree,
-    pub mesh_intersection_setting: MeshIntersectionSetting
+    pub mesh_intersection_setting: MeshIntersectionSetting*/
 }
 
 impl Mesh
@@ -85,7 +85,7 @@ impl Mesh
         println!("bvh_4: {}", timer.elapsed());
         timer.reset();
 
-        let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
+        /*let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
         println!("bvh_128: {}", timer.elapsed());
         timer.reset();
 
@@ -119,7 +119,7 @@ impl Mesh
 
         let grid_64 = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
         println!("grid_64 {}", timer.elapsed());
-        timer.reset();
+        timer.reset();*/
 
         Mesh
         {
@@ -131,9 +131,9 @@ impl Mesh
             t: transform,
             inv_t: transform.inverted(),
             bounds,
-            mesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
+            //mesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
             bvh_4,
-            bvh_128,
+            /*bvh_128,
             bvh_spatial_4,
             bvh_spatial_128,
             kd_tree_24,
@@ -141,7 +141,7 @@ impl Mesh
             kd_tree_16,
             grid_16,
             grid_32,
-            grid_64
+            grid_64*/
         }
     }
 
@@ -159,7 +159,7 @@ impl Mesh
         let bvh_4 = BVH::from_mesh(&triangles, &vertices, &bounds, 4);
         println!("bvh_4: {}", timer.elapsed());
         timer.reset();
-
+/*
         let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
         println!("bvh_128: {}", timer.elapsed());
         timer.reset();
@@ -194,7 +194,7 @@ impl Mesh
 
         let grid_64 = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
         println!("grid_64 {}", timer.elapsed());
-        timer.reset();
+        timer.reset();*/
 
         Mesh
         {
@@ -206,9 +206,9 @@ impl Mesh
             t: transform,
             inv_t: transform.inverted(),
             bounds,
-            mesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
+            //mesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
             bvh_4,
-            bvh_128,
+            /*bvh_128,
             bvh_spatial_4,
             bvh_spatial_128,
             kd_tree_24,
@@ -216,7 +216,7 @@ impl Mesh
             kd_tree_16,
             grid_16,
             grid_32,
-            grid_64
+            grid_64*/
         }
     }
 
@@ -233,7 +233,7 @@ impl Mesh
         println!("bvh_4: {}", timer.elapsed());
         timer.reset();
 
-        let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
+        /*let bvh_128 = BVH::from_mesh(&triangles, &vertices, &bounds, 128);
         println!("bvh_128: {}", timer.elapsed());
         timer.reset();
 
@@ -267,7 +267,7 @@ impl Mesh
 
         let grid_64 = Grid::from_mesh(&triangles, &vertices, &bounds, 64, 64, 64);
         println!("grid_64 {}", timer.elapsed());
-        timer.reset();
+        timer.reset();*/
 
         Mesh
         {
@@ -279,9 +279,9 @@ impl Mesh
             t: transform,
             inv_t: transform.inverted(),
             bounds,
-            mesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
+            //smesh_intersection_setting: MeshIntersectionSetting::BvhSpatial128,
             bvh_4,
-            bvh_128,
+            /*bvh_128,
             bvh_spatial_4,
             bvh_spatial_128,
             kd_tree_24,
@@ -289,7 +289,7 @@ impl Mesh
             kd_tree_16,
             grid_16,
             grid_32,
-            grid_64
+            grid_64*/
         }
     }
 
@@ -417,8 +417,8 @@ impl RayHittableObject for Mesh
             return;
         }
 
-        let mut intersected = false;
-        match self.mesh_intersection_setting
+        let mut intersected = self.bvh_4.intersect(&mut ray_t);
+        /*match self.mesh_intersection_setting
         {
             MeshIntersectionSetting::Raw =>
             {
@@ -467,7 +467,7 @@ impl RayHittableObject for Mesh
             {
                 intersected = self.grid_64.intersect(&mut ray_t, t);
             }
-        }
+        }*/
 
 
         ray.intersection_tests += ray_t.intersection_tests;
