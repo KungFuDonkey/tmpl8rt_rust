@@ -129,12 +129,12 @@ impl GLTexture
         return texture;
     }
 
-    pub fn copy_from_screen(&mut self, screen: &Surface)
+    pub fn copy_from_pixels(&mut self, screen: &Vec<u32>)
     {
         unsafe
         {
             gl::BindTexture(gl::TEXTURE_2D, self.id);
-            gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as GLint, self.width as GLint, self.height as GLint, 0, gl::BGRA, gl::UNSIGNED_BYTE, screen.pixels.as_ptr() as *const c_void);
+            gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as GLint, self.width as GLint, self.height as GLint, 0, gl::BGRA, gl::UNSIGNED_BYTE, screen.as_ptr() as *const c_void);
             let error: GLenum = gl::GetError();
             if error != gl::NO_ERROR
             {

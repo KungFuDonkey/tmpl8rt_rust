@@ -73,7 +73,15 @@ fn main() {
             continue;
         }
 
-        render_target.copy_from_screen(&application.renderer.render_target);
+        if application.use_gpu
+        {
+            render_target.copy_from_pixels(&application.gpu_renderer.output_buffer.host_buffer)
+        }
+        else
+        {
+            render_target.copy_from_pixels(&application.renderer.render_target.pixels);
+        }
+
         shader.bind();
         shader.set_input_texture(0, CString::new("c").unwrap(), &render_target);
         draw_quad();

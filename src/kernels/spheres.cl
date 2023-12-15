@@ -1,6 +1,11 @@
+#include "src/kernels/constants.cl"
 
-
-bool intersect_sphere(float* ray_t, float3* ray_origin, float3* ray_direction, float3* sphere_position, float* sphere_radius2)
+bool intersect_sphere(
+    float* ray_t,
+    float3* ray_origin,
+    float3* ray_direction,
+    float3* sphere_position,
+    float* sphere_radius2)
 {
     float3 oc = *ray_origin - *sphere_position;
     float b = dot(oc, *ray_direction);
@@ -32,7 +37,14 @@ bool intersect_sphere(float* ray_t, float3* ray_origin, float3* ray_direction, f
     return false;
 }
 
-void intersect_spheres(float* ray_t, float3* ray_origin, float3* ray_direction, uint* ray_obj_id, uint* ray_obj_type, uint num_spheres, float3* sphere_positions, float* sphere_radi2)
+void intersect_spheres(
+    float* ray_t,
+    float3* ray_origin,
+    float3* ray_direction,
+    uint* ray_obj_id,
+    uint num_spheres,
+    float3* sphere_positions,
+    float* sphere_radi2)
 {
     for (uint i = 0; i < num_spheres; i++)
     {
@@ -45,6 +57,16 @@ void intersect_spheres(float* ray_t, float3* ray_origin, float3* ray_direction, 
         }
 
         *ray_obj_id = i;
-        *ray_obj_type = 0; // sphere
     }
+}
+
+float3 get_sphere_normal(
+    float3* intersection,
+    uint obj_id,
+    float3* sphere_positions,
+    float* sphere_inv_radi)
+{
+    float3 sphere_position = sphere_positions[obj_id];
+    float sphere_inv_radius = sphere_inv_radi[obj_id];
+    return (*intersection - sphere_position) * sphere_inv_radius;
 }

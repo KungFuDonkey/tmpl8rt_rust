@@ -1,6 +1,6 @@
 use std::ops::{Deref};
 use crate::camera::Camera;
-use crate::scene::{Scene};
+use crate::scene::{GPUScene, Scene};
 use crate::timer::{FrameTimer,Timer};
 use imgui_glfw_rs::imgui::Ui;
 use imgui_glfw_rs::imgui::ImString;
@@ -18,6 +18,7 @@ pub struct Application
     cl: OpenCL,
     camera: Camera,
     scene: Scene,
+    gpu_scene: GPUScene,
     is_animating: bool,
     is_rendering: bool,
     animation_time: f32,
@@ -27,7 +28,8 @@ pub struct Application
     static_frame_timer: Timer,
     ms: f32,
     fps: f32,
-    rps: f32
+    rps: f32,
+    pub use_gpu: bool
 }
 
 impl Application
@@ -39,6 +41,7 @@ impl Application
         scene.change_intersection_setting(&renderer.render_settings.mesh_intersection_setting);
 
         let cl = OpenCL::init();
+        let gpu_scene = GPUScene::from_scene(&cl, &scene);
         let gpu_renderer =  GPURenderer::new(&cl);
 
         Application {
@@ -47,6 +50,7 @@ impl Application
             gpu_renderer,
             camera: Camera::new(),
             scene,
+            gpu_scene,
             is_animating: false,
             is_rendering: true,
             animation_time: 0.0,
@@ -56,7 +60,8 @@ impl Application
             manual_redraw_screen: false,
             ms: 0.0,
             fps: 0.0,
-            rps: 0.0
+            rps: 0.0,
+            use_gpu: true
         }
     }
 
@@ -74,7 +79,15 @@ impl Application
         }
 
         self.internal_timer.reset();
-        self.renderer.render(&self.scene, &self.camera);
+        if self.use_gpu
+        {
+            self.gpu_renderer.render(&self.cl, &self.gpu_scene, &self.camera);
+        }
+        else
+        {
+            self.renderer.render(&self.scene, &self.camera);
+        }
+
         (self.ms, self.fps, self.rps) = self.internal_timer.get_frame_time();
 
         if self.manual_frames_to_render > 0

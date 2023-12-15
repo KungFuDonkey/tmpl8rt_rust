@@ -14,15 +14,16 @@
 
 use std::ffi::{c_void, CString};
 use std::ptr::{null, null_mut};
-use cl3::command_queue::{create_command_queue, release_command_queue};
+use cl3::command_queue::{create_command_queue, enqueue_nd_range_kernel, enqueue_read_buffer, enqueue_write_buffer, flush, release_command_queue};
 use cl3::device::*;
 use cl3::platform::*;
 use cl3::types::*;
 use cl3::context::*;
 use cl3::ext::{CL_PROGRAM_BINARIES, CL_QUEUE_PROFILING_ENABLE};
-use cl3::kernel::create_kernel;
+use cl3::kernel::{create_kernel, set_kernel_arg};
 use cl3::memory::*;
 use cl3::program::{CL_PROGRAM_BUILD_LOG, create_program_with_source, get_program_build_info};
+use crate::math::*;
 use crate::opencl::OpenCLVendor::Nvidia;
 
 /// Finds all the OpenCL platforms and devices on a system.
@@ -388,6 +389,12 @@ impl OpenCL
             }
         }
     }
+
+    pub fn flush_queue(&self)
+    {
+        flush(self.queue)
+            .expect("Failed to flush queue");
+    }
 }
 
 impl Drop for OpenCL
@@ -477,6 +484,11 @@ pub struct OpenCLKernel
     kernel: cl_kernel
 }
 
+pub trait SetArgument<T>
+{
+    fn set_argument(&self, idx: u32, value: T);
+}
+
 impl OpenCLKernel
 {
     pub fn from_program(cl: &OpenCL, program: &OpenCLProgram, entry_point: &str) -> Self
@@ -492,29 +504,137 @@ impl OpenCLKernel
             kernel
         }
     }
+
+    pub fn run(&self, cl: &OpenCL, count: usize)
+    {
+        unsafe
+        {
+            let global_work_dims: *const usize = &count;
+            enqueue_nd_range_kernel(cl.queue, self.kernel, 1, null(), global_work_dims, null() /*local*/, 0, null())
+                .expect("Failed to execute kernel");
+        }
+    }
+
+    pub fn run2d(&self, cl: &OpenCL, count_x: usize, count_y: usize)
+    {
+        unsafe
+        {
+            let dims = [count_x, count_y];
+            let local_dims: [usize; 2] = [32, 4];
+            let global_work_dims: *const usize = &dims[0];
+            let local_work_dims: *const usize = &local_dims[0];
+            enqueue_nd_range_kernel(cl.queue, self.kernel, 2, null(), global_work_dims, local_work_dims, 0, null())
+                .expect("Failed to execute kernel");
+        }
+    }
+}
+
+impl SetArgument<f32> for OpenCLKernel
+{
+    fn set_argument(&self, idx: u32, value: f32) {
+        unsafe
+        {
+            let pointer: *const f32 = &value;
+            set_kernel_arg(self.kernel, idx, std::mem::size_of::<f32>(), pointer as *const c_void)
+                .expect("Failed to set kernel float")
+        }
+    }
+}
+
+impl SetArgument<u32> for OpenCLKernel
+{
+    fn set_argument(&self, idx: u32, value: u32) {
+        unsafe
+        {
+            let pointer: *const u32 = &value;
+            set_kernel_arg(self.kernel, idx, std::mem::size_of::<u32>(), pointer as *const c_void)
+                .expect("Failed to set kernel uint")
+        }
+    }
+}
+
+impl SetArgument<i32> for OpenCLKernel
+{
+    fn set_argument(&self, idx: u32, value: i32) {
+        unsafe
+        {
+            let pointer: *const i32 = &value;
+            set_kernel_arg(self.kernel, idx, std::mem::size_of::<i32>(), pointer as *const c_void)
+                .expect("Failed to set kernel int")
+        }
+    }
+}
+
+impl SetArgument<&Float2> for OpenCLKernel
+{
+    fn set_argument(&self, idx: u32, value: &Float2) {
+        unsafe
+        {
+            let pointer: *const Float2 = value;
+            set_kernel_arg(self.kernel, idx, std::mem::size_of::<Float2>(), pointer as *const c_void)
+                .expect("Failed to set kernel float2")
+        }
+    }
+}
+
+impl SetArgument<&Float3> for OpenCLKernel
+{
+    fn set_argument(&self, idx: u32, value: &Float3) {
+        unsafe
+        {
+            let pointer: *const Float3 = value;
+            set_kernel_arg(self.kernel, idx, std::mem::size_of::<Float3>(), pointer as *const c_void)
+                .expect("Failed to set kernel float3")
+        }
+    }
+}
+
+impl SetArgument<&Float4> for OpenCLKernel
+{
+    fn set_argument(&self, idx: u32, value: &Float4) {
+        unsafe
+        {
+            let pointer: *const Float4 = value;
+            set_kernel_arg(self.kernel, idx, std::mem::size_of::<Float4>(), pointer as *const c_void)
+                .expect("Failed to set kernel float4")
+        }
+    }
+}
+
+impl<T> SetArgument<&OpenCLBuffer<T>> for OpenCLKernel
+{
+    fn set_argument(&self, idx: u32, value: &OpenCLBuffer<T>) {
+        unsafe
+        {
+            let pointer: *const cl_mem = &value.buffer;
+            set_kernel_arg(self.kernel, idx, std::mem::size_of::<cl_mem>(), pointer as *const c_void)
+                .expect("Failed to set kernel buffer")
+        }
+    }
 }
 
 pub struct OpenCLBuffer<T>
 {
-    host_buffer: Vec<T>,
-    buffer: cl_mem
+    pub host_buffer: Vec<T>,
+    buffer: cl_mem,
+    size: usize
 }
 
 impl<T: Clone> OpenCLBuffer<T>
 {
     fn create_buffer(cl: &OpenCL, host_data: Vec<T>, flags: cl_mem_flags) -> Self
     {
-        let mut host_buffer = host_data.clone();
         unsafe
         {
-            let buffer = create_buffer(cl.context, flags, host_data.len(), host_buffer.as_mut_ptr() as *mut c_void)
-                .expect("Failed to create buffer");
+            let size = host_data.len() * std::mem::size_of::<T>();
 
             return OpenCLBuffer
             {
-                host_buffer,
-                buffer
-            }
+                host_buffer: host_data,
+                buffer: create_buffer(cl.context, flags, size, null_mut())
+                    .expect("Failed to create buffer"),
+                size
+            };;
         }
     }
 
@@ -532,5 +652,24 @@ impl<T: Clone> OpenCLBuffer<T>
     {
         return OpenCLBuffer::create_buffer(cl, host_data, CL_MEM_WRITE_ONLY);
     }
+
+    pub fn copy_to_device(&self, cl: &OpenCL)
+    {
+        unsafe
+        {
+            enqueue_write_buffer(cl.queue, self.buffer, 1, 0, self.size, self.host_buffer.as_ptr() as *const c_void, 0, null())
+                .expect("Failed to write buffer to device");
+        }
+    }
+
+    pub fn copy_from_device(&mut self, cl: &OpenCL)
+    {
+        unsafe
+        {
+            enqueue_read_buffer(cl.queue, self.buffer, 1, 0, self.size, self.host_buffer.as_mut_ptr() as *mut c_void, 0, null())
+                .expect("Failed to read buffer from device");
+        }
+    }
+
 }
 
