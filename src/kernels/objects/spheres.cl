@@ -41,32 +41,28 @@ void intersect_spheres(
     float* ray_t,
     float3* ray_origin,
     float3* ray_direction,
+    float3* ray_intersection,
+    float3* ray_normal,
     uint* ray_obj_id,
     uint num_spheres,
     float3* sphere_positions,
-    float* sphere_radi2)
+    float* sphere_radi)
 {
     for (uint i = 0; i < num_spheres; i++)
     {
         float3 sphere_position = sphere_positions[i];
-        float sphere_radius2 = sphere_radi2[i];
+        float sphere_radius = sphere_radi[i];
+        float sphere_radius2 = sphere_radius * sphere_radius;
 
         if (!intersect_sphere(ray_t, ray_origin, ray_direction, &sphere_position, &sphere_radius2))
         {
             continue;
         }
 
-        *ray_obj_id = i;
-    }
-}
+        float sphere_inv_radius = 1.0f / sphere_radius;
 
-float3 get_sphere_normal(
-    float3* intersection,
-    uint obj_id,
-    float3* sphere_positions,
-    float* sphere_inv_radi)
-{
-    float3 sphere_position = sphere_positions[obj_id];
-    float sphere_inv_radius = sphere_inv_radi[obj_id];
-    return (*intersection - sphere_position) * sphere_inv_radius;
+        *ray_obj_id = i;
+        *ray_intersection = *ray_t * *ray_direction + *ray_origin;
+        *ray_normal = (*ray_intersection - sphere_position) * sphere_inv_radius;
+    }
 }

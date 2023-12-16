@@ -447,8 +447,7 @@ impl Scene
 pub struct GPUScene
 {
     pub sphere_positions: OpenCLBuffer<Float3>,
-    pub sphere_radi2: OpenCLBuffer<f32>,
-    pub sphere_inv_radi: OpenCLBuffer<f32>,
+    pub sphere_radi: OpenCLBuffer<f32>
 }
 
 impl GPUScene
@@ -463,28 +462,23 @@ impl GPUScene
     pub fn from_scene(cl: &OpenCL, scene: &Scene) -> Self
     {
         let mut sphere_positions: Vec<Float3> = Vec::with_capacity(scene.spheres.len());
-        let mut sphere_radi2: Vec<f32> = Vec::with_capacity(scene.spheres.len());
-        let mut sphere_inv_radi: Vec<f32> = Vec::with_capacity(scene.spheres.len());
+        let mut sphere_radi: Vec<f32> = Vec::with_capacity(scene.spheres.len());
         for sphere in &scene.spheres
         {
             sphere_positions.push(sphere.position);
-            sphere_radi2.push(sphere.radius2);
-            sphere_inv_radi.push(sphere.inv_radius);
+            sphere_radi.push(sphere.radius);
         }
 
         let sphere_positions = OpenCLBuffer::read_write(cl, sphere_positions);
-        let sphere_radi2 = OpenCLBuffer::read_write(cl, sphere_radi2);
-        let sphere_inv_radi = OpenCLBuffer::read_write(cl, sphere_inv_radi);
+        let sphere_radi = OpenCLBuffer::read_write(cl, sphere_radi);
 
         sphere_positions.copy_to_device(cl);
-        sphere_radi2.copy_to_device(cl);
-        sphere_inv_radi.copy_to_device(cl);
+        sphere_radi.copy_to_device(cl);
 
         GPUScene
         {
             sphere_positions,
-            sphere_radi2,
-            sphere_inv_radi
+            sphere_radi
         }
     }
 }
