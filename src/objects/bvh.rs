@@ -6,14 +6,14 @@ use crate::objects::aabb::*;
 use crate::objects::triangle::*;
 
 #[derive(Clone, Copy)]
-struct BVHTriangle
+pub struct BVHTriangle
 {
     pub bounds: AABB,               // 24 bytes
     pub internal_triangle: Triangle // 40 bytes
 }                                   // 64 bytes
 
 #[derive(Clone, Copy)]
-struct BVHNode
+pub struct BVHNode
 {
     pub bounds: AABB,
     pub tri_count: usize,
@@ -153,8 +153,8 @@ impl Clipped
 
 pub struct BVH
 {
-    triangles: Vec<BVHTriangle>,
-    bvh_nodes: Vec<BVHNode>,
+    pub triangles: Vec<BVHTriangle>,
+    pub bvh_nodes: Vec<BVHNode>,
     pub triangle_idx: Vec<usize>,
     pub triangle_tmp: Vec<usize>,
     pub root_node_idx: usize,

@@ -6,6 +6,34 @@ struct mat4
 
 #define IDENTITY_MATRIX {{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f}}
 
+float4 multiply_matrix(float4* a, struct mat4* m)
+{
+    return (float4)(
+        m->cell[0] * a->x + m->cell[1] * a->y + m->cell[2] * a->z + m->cell[3] * a->w,
+        m->cell[4] * a->x + m->cell[5] * a->y + m->cell[6] * a->z + m->cell[7] * a->w,
+        m->cell[8] * a->x + m->cell[9] * a->y + m->cell[10] * a->z + m->cell[11] * a->w,
+        m->cell[12] * a->x + m->cell[13] * a->y + m->cell[14] * a->z + m->cell[15] * a->w
+    );
+}
+
+float3 transform_position(float3* a, struct mat4* m)
+{
+    return (float3)(
+        m->cell[0] * a->x + m->cell[1] * a->y + m->cell[2] * a->z + m->cell[3],
+        m->cell[4] * a->x + m->cell[5] * a->y + m->cell[6] * a->z + m->cell[7],
+        m->cell[8] * a->x + m->cell[9] * a->y + m->cell[10] * a->z + m->cell[11]
+    );
+}
+
+float3 transform_vector(float3* a, struct mat4* m)
+{
+    return (float3)(
+       m->cell[0] * a->x + m->cell[1] * a->y + m->cell[2] * a->z,
+       m->cell[4] * a->x + m->cell[5] * a->y + m->cell[6] * a->z,
+       m->cell[8] * a->x + m->cell[9] * a->y + m->cell[10] * a->z
+   );
+}
+
 struct mat4 invert_mat4(struct mat4* other)
 {
     float inv[16] = {

@@ -40,6 +40,7 @@ void intersect_planes(
 
         *ray_material = plane_materials[i];
         *ray_intersection = *ray_t * *ray_direction + *ray_origin;
-        *ray_normal = plane_normal;
+        float3 normal = plane_normal;
+        *ray_normal = dot(normal, *ray_direction) > 0.0f ? -normal : normal;
     }
 }

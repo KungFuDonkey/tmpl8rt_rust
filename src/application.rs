@@ -42,7 +42,8 @@ impl Application
 
         let cl = OpenCL::init();
         let gpu_scene = GPUScene::from_scene(&cl, &scene);
-        let gpu_renderer =  GPURenderer::new(&cl);
+        let mut gpu_renderer =  GPURenderer::new(&cl);
+        gpu_renderer.set_scene(&gpu_scene);
 
         Application {
             renderer,

@@ -8,6 +8,8 @@ use crate::objects::cube::*;
 use crate::objects::torus::*;
 use crate::objects::quad::*;
 use crate::objects::mesh::*;
+use crate::objects::triangle::*;
+use crate::obj_loader::*;
 use crate::opencl::{OpenCL, OpenCLBuffer};
 
 pub struct Scene
@@ -51,7 +53,7 @@ impl Scene
         let transform = Mat4::translate( &Float3::from_xyz(0.0, 0.0, 1.0)) * Mat4::scale(0.5);
         meshes.push(Mesh::from_tri_file(0, 8, transform, std::path::Path::new("./assets/unity.tri")));
 
-        /*let transform = Mat4::translate( &Float3::from_xyz(1.0, 0.0, 0.5)) * Mat4::scale(0.5);
+        let transform = Mat4::translate( &Float3::from_xyz(1.0, 0.0, 0.5)) * Mat4::scale(0.5);
         let (msh, mts) = load_obj(&std::path::Path::new("./assets/suzanne.obj"), meshes.len(), materials.len(), &transform);
 
         for mesh in msh
@@ -62,7 +64,7 @@ impl Scene
         for material in mts
         {
             materials.push(material);
-        }*/
+        }
 
         let mut scene = Scene{
             spheres: vec![
@@ -455,6 +457,16 @@ pub struct GPUScene
     pub quad_sizes: OpenCLBuffer<f32>,
     pub quad_inv_transforms: OpenCLBuffer<Mat4>,
     pub quad_materials: OpenCLBuffer<u32>,
+    pub mesh_offsets: OpenCLBuffer<u32>,
+    pub mesh_triangle_offsets: OpenCLBuffer<u32>,
+    pub mesh_inv_transforms: OpenCLBuffer<Mat4>,
+    pub mesh_min_bounds: OpenCLBuffer<Float3>,
+    pub mesh_max_bounds: OpenCLBuffer<Float3>,
+    pub mesh_tri_counts: OpenCLBuffer<u32>,
+    pub mesh_left_firsts: OpenCLBuffer<u32>,
+    pub mesh_triangles: OpenCLBuffer<Triangle>,
+    pub mesh_triangle_normals: OpenCLBuffer<Float3>,
+    pub mesh_materials: OpenCLBuffer<u32>
 }
 
 impl GPUScene
@@ -498,7 +510,7 @@ impl GPUScene
         plane_materials[4] = (0   << 16) + (255 << 8) + 0  ;
         plane_materials[5] = (128 << 16) + (128 << 8) + 128;
 
-        let mut quad_sizes: Vec<f32> = Vec::with_capacity(scene.quads.len());;
+        let mut quad_sizes: Vec<f32> = Vec::with_capacity(scene.quads.len());
         let mut quad_inv_transforms: Vec<Mat4> = Vec::with_capacity(scene.quads.len());
         let mut quad_materials: Vec<u32> = Vec::with_capacity(scene.quads.len());
         for quad in &scene.quads
@@ -513,6 +525,46 @@ impl GPUScene
         quad_materials[2] = (255 << 16) + (255 << 8) + 255;
         quad_materials[3] = (255 << 16) + (255 << 8) + 255;
 
+        let mut mesh_offsets: Vec<u32> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_triangle_offsets: Vec<u32> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_inv_transforms: Vec<Mat4> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_min_bounds: Vec<Float3> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_max_bounds: Vec<Float3> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_tri_counts: Vec<u32> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_left_firsts: Vec<u32> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_triangles: Vec<Triangle> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_triangle_normals: Vec<Float3> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_materials: Vec<u32> = Vec::with_capacity(scene.meshes.len());
+
+        let mut mesh_offset = 0;
+        let mut triangle_offset = 0;
+        for mesh in &scene.meshes
+        {
+            mesh_offsets.push(mesh_offset);
+            mesh_offset += mesh.bvh_4.bvh_nodes.len() as u32;
+            mesh_inv_transforms.push(mesh.inv_t);
+            for bvh_node in &mesh.bvh_4.bvh_nodes
+            {
+                mesh_min_bounds.push(bvh_node.bounds.min_bound);
+                mesh_max_bounds.push(bvh_node.bounds.max_bound);
+                mesh_tri_counts.push(bvh_node.tri_count as u32);
+                mesh_left_firsts.push(bvh_node.left_first as u32);
+            }
+            for id in &mesh.bvh_4.triangle_idx
+            {
+                mesh_triangles.push(mesh.bvh_4.triangles[*id].internal_triangle);
+            }
+            for normal in &mesh.triangle_normals
+            {
+                mesh_triangle_normals.push(*normal);
+            }
+            mesh_triangle_offsets.push(triangle_offset);
+            triangle_offset += mesh.bvh_4.triangle_idx.len() as u32;
+            mesh_materials.push(mesh.mat_idx as u32);
+        }
+
+        mesh_materials[0] = (255 << 16);
+
         let sphere_positions = OpenCLBuffer::read_write(cl, sphere_positions);
         let sphere_radi = OpenCLBuffer::read_write(cl, sphere_radi);
         let sphere_materials = OpenCLBuffer::read_write(cl, sphere_materials);
@@ -522,6 +574,16 @@ impl GPUScene
         let quad_sizes = OpenCLBuffer::read_write(cl, quad_sizes);
         let quad_inv_transforms = OpenCLBuffer::read_write(cl, quad_inv_transforms);
         let quad_materials = OpenCLBuffer::read_write(cl, quad_materials);
+        let mesh_offsets = OpenCLBuffer::read_write(cl, mesh_offsets);
+        let mesh_triangle_offsets = OpenCLBuffer::read_write(cl, mesh_triangle_offsets);
+        let mesh_inv_transforms = OpenCLBuffer::read_write(cl, mesh_inv_transforms);
+        let mesh_min_bounds =  OpenCLBuffer::read_write(cl, mesh_min_bounds);
+        let mesh_max_bounds = OpenCLBuffer::read_write(cl, mesh_max_bounds);
+        let mesh_tri_counts = OpenCLBuffer::read_write(cl, mesh_tri_counts);
+        let mesh_left_firsts = OpenCLBuffer::read_write(cl, mesh_left_firsts);
+        let mesh_triangles = OpenCLBuffer::read_write(cl, mesh_triangles);
+        let mesh_triangle_normals = OpenCLBuffer::read_write(cl, mesh_triangle_normals);
+        let mesh_materials = OpenCLBuffer::read_write(cl, mesh_materials);
 
         sphere_positions.copy_to_device(cl);
         sphere_radi.copy_to_device(cl);
@@ -532,6 +594,16 @@ impl GPUScene
         quad_sizes.copy_to_device(cl);
         quad_inv_transforms.copy_to_device(cl);
         quad_materials.copy_to_device(cl);
+        mesh_offsets.copy_to_device(cl);
+        mesh_triangle_offsets.copy_to_device(cl);
+        mesh_inv_transforms.copy_to_device(cl);
+        mesh_min_bounds.copy_to_device(cl);
+        mesh_max_bounds.copy_to_device(cl);
+        mesh_tri_counts.copy_to_device(cl);
+        mesh_left_firsts.copy_to_device(cl);
+        mesh_triangles.copy_to_device(cl);
+        mesh_triangle_normals.copy_to_device(cl);
+        mesh_materials.copy_to_device(cl);
 
         GPUScene
         {
@@ -543,7 +615,17 @@ impl GPUScene
             plane_materials,
             quad_sizes,
             quad_inv_transforms,
-            quad_materials
+            quad_materials,
+            mesh_inv_transforms,
+            mesh_offsets,
+            mesh_triangle_offsets,
+            mesh_min_bounds,
+            mesh_max_bounds,
+            mesh_tri_counts,
+            mesh_left_firsts,
+            mesh_triangles,
+            mesh_triangle_normals,
+            mesh_materials
         }
     }
 }

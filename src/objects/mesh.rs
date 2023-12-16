@@ -33,7 +33,7 @@ pub struct Mesh
     pub inv_t: Mat4,
     pub bounds: AABB,
     pub bvh_4: BVH,
-/*    pub bvh_128: BVH,
+/*  pub bvh_128: BVH,
     pub bvh_spatial_4: BVH,
     pub bvh_spatial_128: BVH,
     pub grid_16: Grid,

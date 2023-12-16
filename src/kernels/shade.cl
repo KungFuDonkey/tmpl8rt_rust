@@ -27,5 +27,7 @@ __kernel void shade(
 
     uint material = materials[idx];
     float3 color = from_uint_to_float3(material);
-    accumulator[idx] = color;
+
+    float3 normal = normals[idx];
+    accumulator[idx] = (normal + 1.0f) * 0.5f;
 }

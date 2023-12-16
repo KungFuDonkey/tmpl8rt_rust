@@ -6,6 +6,6 @@ pub mod sphere;
 pub mod torus;
 pub mod mesh;
 pub mod grid;
-mod triangle;
+pub mod triangle;
 mod aabb;
 pub mod kd_tree;

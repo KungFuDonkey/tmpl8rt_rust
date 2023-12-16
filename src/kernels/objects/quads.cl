@@ -54,7 +54,8 @@ void intersect_quads(
         struct mat4 quad_transform = invert_mat4(&quad_inv_transform);
         *ray_material = quad_materials[i];
         *ray_intersection = *ray_t * *ray_direction + *ray_origin;
-        *ray_normal = (float3)(quad_transform.cell[1], quad_transform.cell[5], quad_transform.cell[9]);
+        float3 normal = (float3)(-quad_transform.cell[1], -quad_transform.cell[5], -quad_transform.cell[9]);
+        *ray_normal = dot(normal, *ray_direction) > 0.0f ? -normal : normal;
     }
 }
 

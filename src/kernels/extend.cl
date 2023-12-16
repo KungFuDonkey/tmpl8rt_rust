@@ -1,6 +1,7 @@
 #include "src/kernels/objects/spheres.cl"
 #include "src/kernels/objects/planes.cl"
 #include "src/kernels/objects/quads.cl"
+#include "src/kernels/objects/meshes.cl"
 
 __kernel void extend(
     uint num_rays,
@@ -21,7 +22,18 @@ __kernel void extend(
     uint num_quads,
     __global float* quad_sizes,
     __global struct mat4* quad_inv_transforms,
-    __global struct uint* quad_materials)
+    __global uint* quad_materials,
+    uint num_meshes,
+    __global uint* mesh_offsets,
+    __global uint* mesh_triangle_offsets,
+    __global struct mat4* mesh_inv_transforms,
+    __global float3* mesh_min_bounds,
+    __global float3* mesh_max_bounds,
+    __global uint* mesh_tri_counts,
+    __global uint* mesh_left_firsts,
+    __global struct triangle* mesh_triangles,
+    __global float3* mesh_triangle_normals,
+    __global uint* mesh_materials)
 {
     int idx = get_global_id(0);
     if (idx >= num_rays)
@@ -40,6 +52,7 @@ __kernel void extend(
     intersect_spheres(&ray_t, &ray_origin, &ray_direction, &ray_intersection, &ray_normal, &ray_material, num_spheres, sphere_positions, sphere_radi, sphere_materials);
     intersect_planes(&ray_t, &ray_origin, &ray_direction, &ray_intersection, &ray_normal, &ray_material, num_planes, plane_normals, plane_distances, plane_materials);
     intersect_quads(&ray_t, &ray_origin, &ray_direction, &ray_intersection, &ray_normal, &ray_material, num_quads, quad_sizes, quad_inv_transforms, quad_materials);
+    intersect_meshes(&ray_t, &ray_origin, &ray_direction, &ray_intersection, &ray_normal, &ray_material, num_meshes, mesh_offsets, mesh_triangle_offsets, mesh_inv_transforms, mesh_min_bounds, mesh_max_bounds, mesh_tri_counts, mesh_left_firsts, mesh_triangles, mesh_triangle_normals, mesh_materials);
 
     if (ray_t >= original_ray_t)
     {

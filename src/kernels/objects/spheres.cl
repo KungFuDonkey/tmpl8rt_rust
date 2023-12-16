@@ -64,6 +64,7 @@ void intersect_spheres(
 
         *ray_material = sphere_materials[i];
         *ray_intersection = *ray_t * *ray_direction + *ray_origin;
-        *ray_normal = (*ray_intersection - sphere_position) * sphere_inv_radius;
+        float3 normal = (*ray_intersection - sphere_position) * sphere_inv_radius;
+        *ray_normal = dot(normal, *ray_direction) > 0.0f ? -normal : normal;
     }
 }

@@ -127,15 +127,8 @@ impl GPURenderer
         }
     }
 
-    pub fn render(&mut self, cl: &OpenCL, scene: &GPUScene, camera: &Camera)
+    pub fn set_scene(&mut self, scene: &GPUScene)
     {
-        self.generate_rays_kernel.set_argument(2, &camera.position);
-        self.generate_rays_kernel.set_argument(3, &camera.top_left);
-        self.generate_rays_kernel.set_argument(4, &camera.bottom_left);
-        self.generate_rays_kernel.set_argument(5, &camera.top_right);
-
-        self.generate_rays_kernel.run2d(cl, SCRWIDTH, SCRHEIGHT);
-
         self.extend_kernel.set_argument(7, scene.sphere_positions.host_buffer.len() as u32);
         self.extend_kernel.set_argument(8, &scene.sphere_positions);
         self.extend_kernel.set_argument(9, &scene.sphere_radi);
@@ -148,6 +141,29 @@ impl GPURenderer
         self.extend_kernel.set_argument(16, &scene.quad_sizes);
         self.extend_kernel.set_argument(17, &scene.quad_inv_transforms);
         self.extend_kernel.set_argument(18, &scene.quad_materials);
+        self.extend_kernel.set_argument(19, scene.mesh_offsets.host_buffer.len() as u32);
+        self.extend_kernel.set_argument(20, &scene.mesh_offsets);
+        self.extend_kernel.set_argument(21, &scene.mesh_triangle_offsets);
+        self.extend_kernel.set_argument(22, &scene.mesh_inv_transforms);
+        self.extend_kernel.set_argument(23, &scene.mesh_min_bounds);
+        self.extend_kernel.set_argument(24, &scene.mesh_max_bounds);
+        self.extend_kernel.set_argument(25, &scene.mesh_tri_counts);
+        self.extend_kernel.set_argument(26, &scene.mesh_left_firsts);
+        self.extend_kernel.set_argument(27, &scene.mesh_triangles);
+        self.extend_kernel.set_argument(28, &scene.mesh_triangle_normals);
+        self.extend_kernel.set_argument(29, &scene.mesh_materials);
+
+    }
+
+    pub fn render(&mut self, cl: &OpenCL, scene: &GPUScene, camera: &Camera)
+    {
+        self.generate_rays_kernel.set_argument(2, &camera.position);
+        self.generate_rays_kernel.set_argument(3, &camera.top_left);
+        self.generate_rays_kernel.set_argument(4, &camera.bottom_left);
+        self.generate_rays_kernel.set_argument(5, &camera.top_right);
+
+        self.generate_rays_kernel.run2d(cl, SCRWIDTH, SCRHEIGHT);
+
         self.extend_kernel.run(cl, self.num_rays);
 
         self.shade_kernel.run(cl, self.num_rays);

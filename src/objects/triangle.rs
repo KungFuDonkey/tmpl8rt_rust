@@ -1,6 +1,7 @@
 use crate::math::*;
 use crate::ray::*;
 
+
 #[derive(Clone, Copy)]
 pub struct Triangle
 {
