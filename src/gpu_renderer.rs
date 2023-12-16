@@ -95,7 +95,7 @@ impl GPURenderer
         shade_kernel.set_argument(4, &intersections);
         shade_kernel.set_argument(5, &normals);
         shade_kernel.set_argument(6, &materials);
-        shade_kernel.set_argument(9, &accumulator);
+        shade_kernel.set_argument(7, &accumulator);
 
         finalize_kernel.set_argument(0, &accumulator);
         finalize_kernel.set_argument(1, &output_buffer);
@@ -140,10 +140,16 @@ impl GPURenderer
         self.extend_kernel.set_argument(8, &scene.sphere_positions);
         self.extend_kernel.set_argument(9, &scene.sphere_radi);
         self.extend_kernel.set_argument(10, &scene.sphere_materials);
+        self.extend_kernel.set_argument(11, scene.plane_normals.host_buffer.len() as u32);
+        self.extend_kernel.set_argument(12, &scene.plane_normals);
+        self.extend_kernel.set_argument(13, &scene.plane_distances);
+        self.extend_kernel.set_argument(14, &scene.plane_materials);
+        self.extend_kernel.set_argument(15, scene.quad_sizes.host_buffer.len() as u32);
+        self.extend_kernel.set_argument(16, &scene.quad_sizes);
+        self.extend_kernel.set_argument(17, &scene.quad_inv_transforms);
+        self.extend_kernel.set_argument(18, &scene.quad_materials);
         self.extend_kernel.run(cl, self.num_rays);
 
-        self.shade_kernel.set_argument(7, &scene.sphere_positions);
-        self.shade_kernel.set_argument(8, &scene.sphere_radi);
         self.shade_kernel.run(cl, self.num_rays);
 
         self.finalize_kernel.run(cl, self.num_rays);

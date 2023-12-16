@@ -10,8 +10,6 @@ __kernel void shade(
     __global float3* intersections,
     __global float3* normals,
     __global uint* materials,
-    __global float3* sphere_positions,
-    __global float* sphere_radi,
     __global float3* accumulator)
 {
     int idx = get_global_id(0);

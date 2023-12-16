@@ -1,4 +1,6 @@
 #include "src/kernels/objects/spheres.cl"
+#include "src/kernels/objects/planes.cl"
+#include "src/kernels/objects/quads.cl"
 
 __kernel void extend(
     uint num_rays,
@@ -11,7 +13,15 @@ __kernel void extend(
     uint num_spheres,
     __global float3* sphere_positions,
     __global float* sphere_radi,
-    __global uint* sphere_materials)
+    __global uint* sphere_materials,
+    uint num_planes,
+    __global float3* plane_normals,
+    __global float* plane_distances,
+    __global uint* plane_materials,
+    uint num_quads,
+    __global float* quad_sizes,
+    __global struct mat4* quad_inv_transforms,
+    __global struct uint* quad_materials)
 {
     int idx = get_global_id(0);
     if (idx >= num_rays)
@@ -28,6 +38,8 @@ __kernel void extend(
     uint ray_material = 0;
 
     intersect_spheres(&ray_t, &ray_origin, &ray_direction, &ray_intersection, &ray_normal, &ray_material, num_spheres, sphere_positions, sphere_radi, sphere_materials);
+    intersect_planes(&ray_t, &ray_origin, &ray_direction, &ray_intersection, &ray_normal, &ray_material, num_planes, plane_normals, plane_distances, plane_materials);
+    intersect_quads(&ray_t, &ray_origin, &ray_direction, &ray_intersection, &ray_normal, &ray_material, num_quads, quad_sizes, quad_inv_transforms, quad_materials);
 
     if (ray_t >= original_ray_t)
     {

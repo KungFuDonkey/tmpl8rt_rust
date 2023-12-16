@@ -448,7 +448,13 @@ pub struct GPUScene
 {
     pub sphere_positions: OpenCLBuffer<Float3>,
     pub sphere_radi: OpenCLBuffer<f32>,
-    pub sphere_materials: OpenCLBuffer<u32>
+    pub sphere_materials: OpenCLBuffer<u32>,
+    pub plane_normals: OpenCLBuffer<Float3>,
+    pub plane_distances: OpenCLBuffer<f32>,
+    pub plane_materials: OpenCLBuffer<u32>,
+    pub quad_sizes: OpenCLBuffer<f32>,
+    pub quad_inv_transforms: OpenCLBuffer<Mat4>,
+    pub quad_materials: OpenCLBuffer<u32>,
 }
 
 impl GPUScene
@@ -471,24 +477,73 @@ impl GPUScene
             sphere_radi.push(sphere.radius);
             sphere_materials.push(sphere.mat_idx as u32);
         }
-
         // todo convert materials
         sphere_materials[0] = (255 << 16);
         sphere_materials[1] = 255;
 
+        let mut plane_normals: Vec<Float3> = Vec::with_capacity(scene.planes.len());
+        let mut plane_distances: Vec<f32> = Vec::with_capacity(scene.planes.len());
+        let mut plane_materials: Vec<u32> = Vec::with_capacity(scene.planes.len());
+        for plane in &scene.planes
+        {
+            plane_normals.push(plane.normal);
+            plane_distances.push(plane.distance);
+            plane_materials.push(plane.mat_idx as u32);
+        }
+
+        plane_materials[0] = (255 << 16) + (128 << 8) + 255;
+        plane_materials[1] = (255 << 16) + (0   << 8) + 255;
+        plane_materials[2] = (0   << 16) + (255 << 8) + 255;
+        plane_materials[3] = (255 << 16) + (255 << 8) + 0  ;
+        plane_materials[4] = (0   << 16) + (255 << 8) + 0  ;
+        plane_materials[5] = (128 << 16) + (128 << 8) + 128;
+
+        let mut quad_sizes: Vec<f32> = Vec::with_capacity(scene.quads.len());;
+        let mut quad_inv_transforms: Vec<Mat4> = Vec::with_capacity(scene.quads.len());
+        let mut quad_materials: Vec<u32> = Vec::with_capacity(scene.quads.len());
+        for quad in &scene.quads
+        {
+            quad_sizes.push(quad.size);
+            quad_inv_transforms.push(quad.inv_t);
+            quad_materials.push(quad.mat_idx as u32);
+        }
+
+        quad_materials[0] = (255 << 16) + (255 << 8) + 255;
+        quad_materials[1] = (255 << 16) + (255 << 8) + 255;
+        quad_materials[2] = (255 << 16) + (255 << 8) + 255;
+        quad_materials[3] = (255 << 16) + (255 << 8) + 255;
+
         let sphere_positions = OpenCLBuffer::read_write(cl, sphere_positions);
         let sphere_radi = OpenCLBuffer::read_write(cl, sphere_radi);
         let sphere_materials = OpenCLBuffer::read_write(cl, sphere_materials);
+        let plane_normals = OpenCLBuffer::read_write(cl, plane_normals);
+        let plane_distances = OpenCLBuffer::read_write(cl, plane_distances);
+        let plane_materials = OpenCLBuffer::read_write(cl, plane_materials);
+        let quad_sizes = OpenCLBuffer::read_write(cl, quad_sizes);
+        let quad_inv_transforms = OpenCLBuffer::read_write(cl, quad_inv_transforms);
+        let quad_materials = OpenCLBuffer::read_write(cl, quad_materials);
 
         sphere_positions.copy_to_device(cl);
         sphere_radi.copy_to_device(cl);
         sphere_materials.copy_to_device(cl);
+        plane_normals.copy_to_device(cl);
+        plane_distances.copy_to_device(cl);
+        plane_materials.copy_to_device(cl);
+        quad_sizes.copy_to_device(cl);
+        quad_inv_transforms.copy_to_device(cl);
+        quad_materials.copy_to_device(cl);
 
         GPUScene
         {
             sphere_positions,
             sphere_radi,
-            sphere_materials
+            sphere_materials,
+            plane_normals,
+            plane_distances,
+            plane_materials,
+            quad_sizes,
+            quad_inv_transforms,
+            quad_materials
         }
     }
 }
