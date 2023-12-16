@@ -16,7 +16,7 @@ pub struct GPURenderer
     directions: OpenCLBuffer<Float3>,
     normals: OpenCLBuffer<Float3>,
     intersections: OpenCLBuffer<Float3>,
-    obj_ids: OpenCLBuffer<u32>,
+    materials: OpenCLBuffer<u32>,
     accumulator: OpenCLBuffer<Float3>,
     num_rays: usize,
     pub output_buffer: OpenCLBuffer<u32>,
@@ -47,7 +47,7 @@ impl GPURenderer
         let mut normals: Vec<Float3> = Vec::with_capacity(num_rays);
         let mut intersections: Vec<Float3> = Vec::with_capacity(num_rays);
         let mut output_buffer: Vec<u32> = Vec::with_capacity(num_rays);
-        let mut obj_ids: Vec<u32> = Vec::with_capacity(num_rays);
+        let mut materials: Vec<u32> = Vec::with_capacity(num_rays);
         let mut accumulator: Vec<Float3> = Vec::with_capacity(num_rays);
 
         for _ in 0..num_rays
@@ -58,7 +58,7 @@ impl GPURenderer
             normals.push(Float3::zero());
             intersections.push(Float3::zero());
             output_buffer.push(0);
-            obj_ids.push(0);
+            materials.push(0);
             accumulator.push(Float3::zero());
         }
 
@@ -67,7 +67,7 @@ impl GPURenderer
         let directions = OpenCLBuffer::read_write(cl, directions);
         let normals = OpenCLBuffer::read_write(cl, normals);
         let intersections = OpenCLBuffer::read_write(cl, intersections);
-        let obj_ids = OpenCLBuffer::read_write(cl, obj_ids);
+        let materials = OpenCLBuffer::read_write(cl, materials);
         let output_buffer = OpenCLBuffer::write_only(cl, output_buffer);
         let accumulator = OpenCLBuffer::read_write(cl, accumulator);
 
@@ -78,7 +78,7 @@ impl GPURenderer
         generate_rays_kernel.set_argument(8, &directions);
         generate_rays_kernel.set_argument(9, &intersections);
         generate_rays_kernel.set_argument(10, &normals);
-        generate_rays_kernel.set_argument(11, &obj_ids);
+        generate_rays_kernel.set_argument(11, &materials);
 
         extend_kernel.set_argument(0, num_rays as u32);
         extend_kernel.set_argument(1, &ts);
@@ -86,7 +86,7 @@ impl GPURenderer
         extend_kernel.set_argument(3, &directions);
         extend_kernel.set_argument(4, &intersections);
         extend_kernel.set_argument(5, &normals);
-        extend_kernel.set_argument(6, &obj_ids);
+        extend_kernel.set_argument(6, &materials);
 
         shade_kernel.set_argument(0, num_rays as u32);
         shade_kernel.set_argument(1, &ts);
@@ -94,7 +94,7 @@ impl GPURenderer
         shade_kernel.set_argument(3, &directions);
         shade_kernel.set_argument(4, &intersections);
         shade_kernel.set_argument(5, &normals);
-        shade_kernel.set_argument(6, &obj_ids);
+        shade_kernel.set_argument(6, &materials);
         shade_kernel.set_argument(9, &accumulator);
 
         finalize_kernel.set_argument(0, &accumulator);
@@ -103,7 +103,7 @@ impl GPURenderer
         ts.copy_to_device(cl);
         origins.copy_to_device(cl);
         directions.copy_to_device(cl);
-        obj_ids.copy_to_device(cl);
+        materials.copy_to_device(cl);
         output_buffer.copy_to_device(cl);
         accumulator.copy_to_device(cl);
 
@@ -120,7 +120,7 @@ impl GPURenderer
             directions,
             normals,
             intersections,
-            obj_ids,
+            materials,
             accumulator,
             output_buffer,
             num_rays
@@ -139,6 +139,7 @@ impl GPURenderer
         self.extend_kernel.set_argument(7, scene.sphere_positions.host_buffer.len() as u32);
         self.extend_kernel.set_argument(8, &scene.sphere_positions);
         self.extend_kernel.set_argument(9, &scene.sphere_radi);
+        self.extend_kernel.set_argument(10, &scene.sphere_materials);
         self.extend_kernel.run(cl, self.num_rays);
 
         self.shade_kernel.set_argument(7, &scene.sphere_positions);

@@ -447,7 +447,8 @@ impl Scene
 pub struct GPUScene
 {
     pub sphere_positions: OpenCLBuffer<Float3>,
-    pub sphere_radi: OpenCLBuffer<f32>
+    pub sphere_radi: OpenCLBuffer<f32>,
+    pub sphere_materials: OpenCLBuffer<u32>
 }
 
 impl GPUScene
@@ -463,22 +464,31 @@ impl GPUScene
     {
         let mut sphere_positions: Vec<Float3> = Vec::with_capacity(scene.spheres.len());
         let mut sphere_radi: Vec<f32> = Vec::with_capacity(scene.spheres.len());
+        let mut sphere_materials: Vec<u32> = Vec::with_capacity(scene.spheres.len());
         for sphere in &scene.spheres
         {
             sphere_positions.push(sphere.position);
             sphere_radi.push(sphere.radius);
+            sphere_materials.push(sphere.mat_idx as u32);
         }
+
+        // todo convert materials
+        sphere_materials[0] = (255 << 16);
+        sphere_materials[1] = 255;
 
         let sphere_positions = OpenCLBuffer::read_write(cl, sphere_positions);
         let sphere_radi = OpenCLBuffer::read_write(cl, sphere_radi);
+        let sphere_materials = OpenCLBuffer::read_write(cl, sphere_materials);
 
         sphere_positions.copy_to_device(cl);
         sphere_radi.copy_to_device(cl);
+        sphere_materials.copy_to_device(cl);
 
         GPUScene
         {
             sphere_positions,
-            sphere_radi
+            sphere_radi,
+            sphere_materials
         }
     }
 }

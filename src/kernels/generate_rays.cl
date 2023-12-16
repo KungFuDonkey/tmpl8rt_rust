@@ -12,7 +12,7 @@ __kernel void generate_rays(
     __global float3* directions,
     __global float3* intersections,
     __global float3* normals,
-    __global uint* obj_ids)
+    __global uint* materials)
 {
     uint x = get_global_id(0);
     uint y = get_global_id(1);
@@ -30,5 +30,5 @@ __kernel void generate_rays(
     directions[idx] = d;
     intersections[idx] = d; // set to something
     normals[idx] = d; // set to something
-    obj_ids[idx] = MAX_UINT;
+    materials[idx] = MAX_UINT;
 }
