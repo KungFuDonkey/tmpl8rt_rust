@@ -1,4 +1,4 @@
-#include "src/kernels/spheres.cl"
+#include "src/kernels/objects/spheres.cl"
 
 __kernel void extend(
     uint num_rays,

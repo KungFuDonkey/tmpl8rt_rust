@@ -1,4 +1,4 @@
-#include "src/kernels/constants.cl"
+#include "src/kernels/tools/constants.cl"
 
 bool intersect_sphere(
     float* ray_t,

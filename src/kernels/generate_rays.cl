@@ -1,4 +1,4 @@
-#include "src/kernels/constants.cl"
+#include "src/kernels/objects/spheres.cl"
 
 __kernel void generate_rays(
     uint screen_width,

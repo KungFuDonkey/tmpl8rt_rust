@@ -1,5 +1,5 @@
-#include "src/kernels/constants.cl"
-#include "src/kernels/spheres.cl"
+#include "src/kernels/tools/constants.cl"
+#include "src/kernels/objects/spheres.cl"
 
 float3 get_normal(
     float3* intersection,
