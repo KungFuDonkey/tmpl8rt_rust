@@ -97,15 +97,15 @@ impl GPURenderer
         let shadow_ray_directions = OpenCLBuffer::read_write(cl, shadow_ray_directions);
         let shadow_light_colors = OpenCLBuffer::read_write(cl, shadow_light_colors);
 
-        generate_rays_kernel.set_argument(0, SCRWIDTH as u32);
-        generate_rays_kernel.set_argument(1, SCRHEIGHT as u32);
-        generate_rays_kernel.set_argument(6, &ts);
-        generate_rays_kernel.set_argument(7, &origins);
-        generate_rays_kernel.set_argument(8, &directions);
-        generate_rays_kernel.set_argument(9, &normals);
-        generate_rays_kernel.set_argument(10, &materials);
-        generate_rays_kernel.set_argument(11, &ray_colors);
-        generate_rays_kernel.set_argument(12, &ray_lights);
+        generate_rays_kernel.set_argument(1, SCRWIDTH as u32);
+        generate_rays_kernel.set_argument(2, SCRHEIGHT as u32);
+        generate_rays_kernel.set_argument(7, &ts);
+        generate_rays_kernel.set_argument(8, &origins);
+        generate_rays_kernel.set_argument(9, &directions);
+        generate_rays_kernel.set_argument(10, &normals);
+        generate_rays_kernel.set_argument(11, &materials);
+        generate_rays_kernel.set_argument(12, &ray_colors);
+        generate_rays_kernel.set_argument(13, &ray_lights);
 
         extend_kernel.set_argument(0, num_rays as u32);
         extend_kernel.set_argument(1, &ts);
@@ -224,15 +224,18 @@ impl GPURenderer
 
     pub fn set_camera(&mut self, camera: &Camera)
     {
-        self.generate_rays_kernel.set_argument(2, &camera.position);
-        self.generate_rays_kernel.set_argument(3, &camera.top_left);
-        self.generate_rays_kernel.set_argument(4, &camera.bottom_left);
-        self.generate_rays_kernel.set_argument(5, &camera.top_right);
+        self.generate_rays_kernel.set_argument(3, &camera.position);
+        self.generate_rays_kernel.set_argument(4, &camera.top_left);
+        self.generate_rays_kernel.set_argument(5, &camera.bottom_left);
+        self.generate_rays_kernel.set_argument(6, &camera.top_right);
         self.rendered_frames = 1;
     }
 
     pub fn render(&mut self, cl: &OpenCL, scene: &GPUScene, camera: &Camera)
     {
+        self.generate_rays_kernel.set_argument(0, self.seed);
+        random_uint_s(&mut self.seed);
+
         self.generate_rays_kernel.run2d(cl, SCRWIDTH, SCRHEIGHT);
         self.finalize_kernel.set_argument(0, self.rendered_frames);
 

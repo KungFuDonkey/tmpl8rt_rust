@@ -97,11 +97,10 @@ __kernel void shade(
         shadow_ray_ts[idx] = shadow_ray_t;
     }
 
-    ray_color *= color;
     float survival_chance = 1.0f;
 
     // russian roulette, start after 2 bounces
-    if (num_bounces > 3)
+    if (num_bounces > 1)
     {
         survival_chance = clamp(max(max(ray_color.x, ray_color.y), ray_color.z), 0.1f, 0.9f);
         if (survival_chance < random_float(&seed))
@@ -119,5 +118,5 @@ __kernel void shade(
     ts[idx] = 1e30;
     origins[idx] = intersection;
     directions[idx] = new_direction;
-    ray_colors[idx] = (1.0f / survival_chance) * PI * BRDF;
+    ray_colors[idx] = ray_color * (1.0f / survival_chance) * PI * BRDF;
 }

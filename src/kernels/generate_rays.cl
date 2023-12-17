@@ -1,6 +1,8 @@
 #include "src/kernels/objects/spheres.cl"
+#include "src/kernels/tools/random.cl"
 
 __kernel void generate_rays(
+    uint glob_seed,
     uint screen_width,
     uint screen_height,
     float3 cam_position,
@@ -18,8 +20,17 @@ __kernel void generate_rays(
     uint x = get_global_id(0);
     uint y = get_global_id(1);
 
-    float u = (float)x / (float)screen_width;
-    float v = (float)y / (float)screen_height;
+    uint seed = init_seed(glob_seed + x + y * screen_width);
+
+    float pixel_width = 1.0f / screen_width;
+    float pixel_height = 1.0f / pixel_height;
+
+
+    //float u = ((float)x + pixel_width * random_float(&seed)) / (float)screen_width;
+    //float v = ((float)y + pixel_height * random_float(&seed)) / (float)screen_height;
+
+    float u = ((float)x + random_float(&seed)) / (float)screen_width;
+    float v = ((float)y + random_float(&seed)) / (float)screen_height;
 
     float3 p = cam_top_left + (cam_top_right - cam_top_left) * u + (cam_bottom_left - cam_top_left) * v;
     float3 d = normalize(p - cam_position);
