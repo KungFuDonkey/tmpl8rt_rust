@@ -1,5 +1,5 @@
 #include "src/kernels/types/mat4.cl"
-
+#include "src/kernels/tools/random.cl"
 
 bool intersect_quad(
     float* ray_t,
@@ -55,5 +55,22 @@ void intersect_quads(
         float3 normal = (float3)(-quad_transform.cell[1], -quad_transform.cell[5], -quad_transform.cell[9]);
         *ray_normal = dot(normal, *ray_direction) > 0.0f ? -normal : normal;
     }
+}
+
+float3 random_point_on_quad(
+    struct mat4* quad_inv_transform,
+    float* quad_size,
+    uint* seed)
+{
+    struct mat4 quad_transform = invert_mat4(quad_inv_transform);
+    float3 sized_corner1 = (float3)(-*quad_size, 0.0, -*quad_size);
+    float3 sized_corner2 = (float3)(*quad_size, 0.0, -*quad_size);
+    float3 sized_corner3 = (float3)(*quad_size, 0.0, *quad_size);
+    float3 corner1 = transform_position(&sized_corner1, &quad_transform);
+    float3 corner2 = transform_position(&sized_corner2, &quad_transform);
+    float3 corner3 = transform_position(&sized_corner3, &quad_transform);
+    float r1 = random_float(seed);
+    float r2 = random_float(seed);
+    return corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1);
 }
 

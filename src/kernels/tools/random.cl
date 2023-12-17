@@ -1,3 +1,4 @@
+#pragma once
 #include "src/kernels/tools/constants.cl"
 
 uint wang_hash(uint seed)
