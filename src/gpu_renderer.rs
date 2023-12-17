@@ -94,14 +94,14 @@ impl GPURenderer
         extend_kernel.set_argument(4, &normals);
         extend_kernel.set_argument(5, &materials);
 
-        shade_kernel.set_argument(1, num_rays as u32);
-        shade_kernel.set_argument(2, &ts);
-        shade_kernel.set_argument(3, &origins);
-        shade_kernel.set_argument(4, &directions);
-        shade_kernel.set_argument(5, &normals);
-        shade_kernel.set_argument(6, &materials);
-        shade_kernel.set_argument(7, &ray_colors);
-        shade_kernel.set_argument(8, &ray_lights);
+        shade_kernel.set_argument(2, num_rays as u32);
+        shade_kernel.set_argument(3, &ts);
+        shade_kernel.set_argument(4, &origins);
+        shade_kernel.set_argument(5, &directions);
+        shade_kernel.set_argument(6, &normals);
+        shade_kernel.set_argument(7, &materials);
+        shade_kernel.set_argument(8, &ray_colors);
+        shade_kernel.set_argument(9, &ray_lights);
 
         finalize_kernel.set_argument(1, &ray_lights);
         finalize_kernel.set_argument(2, &accumulator);
@@ -179,10 +179,11 @@ impl GPURenderer
         self.generate_rays_kernel.run2d(cl, SCRWIDTH, SCRHEIGHT);
         self.finalize_kernel.set_argument(0, self.rendered_frames);
 
-        for _ in 0..2
+        for bounces in 0u32..10u32
         {
             self.extend_kernel.run(cl, self.num_rays);
             self.shade_kernel.set_argument(0, self.seed);
+            self.shade_kernel.set_argument(1, bounces);
             random_uint_s(&mut self.seed);
             self.shade_kernel.run(cl, self.num_rays);
         }

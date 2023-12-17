@@ -5,6 +5,7 @@
 
 __kernel void shade(
     uint glob_seed,
+    uint num_bounces,
     uint num_rays,
     __global float* ts,
     __global float3* origins,
@@ -49,7 +50,21 @@ __kernel void shade(
         return;
     }
 
+    // todo create shadow rays for nee
+
     ray_color *= color;
+    // russian roulette, start after 2 bounces
+    if (num_bounces > 1)
+    {
+        float survival_chance = clamp(max(max(ray_color.x, ray_color.y), ray_color.z), 0.1f, 0.9f);
+        if (survival_chance < random_float(&seed))
+        {
+            // todo remove when wavefront
+            ts[idx] = -1.0f;
+            return;
+        }
+    }
+
     float3 normal = normals[idx];
     float3 ray_origin = origins[idx];
     float3 ray_direction = directions[idx];

@@ -15,11 +15,12 @@ __kernel void finalize(
     float3 new_color = accumulated_color * (1 - weight) + rendered_color * weight;
 
     float3 one = (float3)1;
-    float3 ranged_color = min(rendered_color, one) * 255.0f;
+    float3 ranged_color = min(new_color, one) * 255.0f;
 
     uint r = (uint)ranged_color.x;
     uint g = (uint)ranged_color.y;
     uint b = (uint)ranged_color.z;
 
     output_buffer[idx] = (r << 16) + (g << 8) + b;
+    accumulator[idx] = new_color;
 }
