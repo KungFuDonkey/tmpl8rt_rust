@@ -40,16 +40,19 @@ impl Application
         let mut scene = Scene::new();
         scene.change_intersection_setting(&renderer.render_settings.mesh_intersection_setting);
 
+        let camera = Camera::new();
+
         let cl = OpenCL::init();
         let gpu_scene = GPUScene::from_scene(&cl, &scene);
         let mut gpu_renderer =  GPURenderer::new(&cl);
         gpu_renderer.set_scene(&gpu_scene);
+        gpu_renderer.set_camera(&camera);
 
         Application {
             renderer,
             cl,
             gpu_renderer,
-            camera: Camera::new(),
+            camera,
             scene,
             gpu_scene,
             is_animating: false,
@@ -150,7 +153,14 @@ impl Application
 
         if self.camera.handle_input(&input, delta_time)
         {
-            self.renderer.reset_accumulator();
+            if self.use_gpu
+            {
+                self.gpu_renderer.set_camera(&self.camera);
+            }
+            else
+            {
+                self.renderer.reset_accumulator();
+            }
         }
     }
 

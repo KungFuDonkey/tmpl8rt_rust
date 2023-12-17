@@ -41,13 +41,12 @@ void intersect_spheres(
     float* ray_t,
     float3* ray_origin,
     float3* ray_direction,
-    float3* ray_intersection,
     float3* ray_normal,
-    uint* ray_material,
+    ulong* ray_material,
     uint num_spheres,
     float3* sphere_positions,
     float* sphere_radi,
-    uint* sphere_materials)
+    ulong* sphere_materials)
 {
     for (uint i = 0; i < num_spheres; i++)
     {
@@ -63,8 +62,8 @@ void intersect_spheres(
         float sphere_inv_radius = 1.0f / sphere_radius;
 
         *ray_material = sphere_materials[i];
-        *ray_intersection = *ray_t * *ray_direction + *ray_origin;
-        float3 normal = (*ray_intersection - sphere_position) * sphere_inv_radius;
+        float3 intersection = *ray_t * *ray_direction + *ray_origin;
+        float3 normal = (intersection - sphere_position) * sphere_inv_radius;
         *ray_normal = dot(normal, *ray_direction) > 0.0f ? -normal : normal;
     }
 }

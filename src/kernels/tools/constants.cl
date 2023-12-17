@@ -1,8 +1,11 @@
 
-#define MAX_UINT 4294967295
+#define MAX_UINT (4294967295)
+#define MAX_ULONG (18446744073709551615)
+#define EPSILON 0.00005
 
+#define PI (3.1415926f)
 
-
-#define OBJ_TYPE_MASK (3 << 30)
-#define OBJ_ID_MASK (MAX_UINT - OBJ_TYPE_MASK)
+#define MAT_TYPE_NONE (7 << 61)
+#define MAT_TYPE_LINEAR_COLOR (0)
+#define MAT_TYPE_LIGHT (1)
 

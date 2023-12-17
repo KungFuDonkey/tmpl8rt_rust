@@ -33,13 +33,12 @@ void intersect_quads(
     float* ray_t,
     float3* ray_origin,
     float3* ray_direction,
-    float3* ray_intersection,
     float3* ray_normal,
-    uint* ray_material,
+    ulong* ray_material,
     uint num_quads,
     float* quad_sizes,
     struct mat4* quad_inv_transforms,
-    uint* quad_materials)
+    ulong* quad_materials)
 {
     for (uint i = 0; i < num_quads; i++)
     {
@@ -53,7 +52,6 @@ void intersect_quads(
 
         struct mat4 quad_transform = invert_mat4(&quad_inv_transform);
         *ray_material = quad_materials[i];
-        *ray_intersection = *ray_t * *ray_direction + *ray_origin;
         float3 normal = (float3)(-quad_transform.cell[1], -quad_transform.cell[5], -quad_transform.cell[9]);
         *ray_normal = dot(normal, *ray_direction) > 0.0f ? -normal : normal;
     }

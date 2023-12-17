@@ -450,13 +450,13 @@ pub struct GPUScene
 {
     pub sphere_positions: OpenCLBuffer<Float3>,
     pub sphere_radi: OpenCLBuffer<f32>,
-    pub sphere_materials: OpenCLBuffer<u32>,
+    pub sphere_materials: OpenCLBuffer<u64>,
     pub plane_normals: OpenCLBuffer<Float3>,
     pub plane_distances: OpenCLBuffer<f32>,
-    pub plane_materials: OpenCLBuffer<u32>,
+    pub plane_materials: OpenCLBuffer<u64>,
     pub quad_sizes: OpenCLBuffer<f32>,
     pub quad_inv_transforms: OpenCLBuffer<Mat4>,
-    pub quad_materials: OpenCLBuffer<u32>,
+    pub quad_materials: OpenCLBuffer<u64>,
     pub mesh_offsets: OpenCLBuffer<u32>,
     pub mesh_triangle_offsets: OpenCLBuffer<u32>,
     pub mesh_inv_transforms: OpenCLBuffer<Mat4>,
@@ -466,7 +466,7 @@ pub struct GPUScene
     pub mesh_left_firsts: OpenCLBuffer<u32>,
     pub mesh_triangles: OpenCLBuffer<Triangle>,
     pub mesh_triangle_normals: OpenCLBuffer<Float3>,
-    pub mesh_materials: OpenCLBuffer<u32>
+    pub mesh_materials: OpenCLBuffer<u64>
 }
 
 impl GPUScene
@@ -482,12 +482,12 @@ impl GPUScene
     {
         let mut sphere_positions: Vec<Float3> = Vec::with_capacity(scene.spheres.len());
         let mut sphere_radi: Vec<f32> = Vec::with_capacity(scene.spheres.len());
-        let mut sphere_materials: Vec<u32> = Vec::with_capacity(scene.spheres.len());
+        let mut sphere_materials: Vec<u64> = Vec::with_capacity(scene.spheres.len());
         for sphere in &scene.spheres
         {
             sphere_positions.push(sphere.position);
             sphere_radi.push(sphere.radius);
-            sphere_materials.push(sphere.mat_idx as u32);
+            sphere_materials.push(sphere.mat_idx as u64);
         }
         // todo convert materials
         sphere_materials[0] = (255 << 16);
@@ -495,12 +495,12 @@ impl GPUScene
 
         let mut plane_normals: Vec<Float3> = Vec::with_capacity(scene.planes.len());
         let mut plane_distances: Vec<f32> = Vec::with_capacity(scene.planes.len());
-        let mut plane_materials: Vec<u32> = Vec::with_capacity(scene.planes.len());
+        let mut plane_materials: Vec<u64> = Vec::with_capacity(scene.planes.len());
         for plane in &scene.planes
         {
             plane_normals.push(plane.normal);
             plane_distances.push(plane.distance);
-            plane_materials.push(plane.mat_idx as u32);
+            plane_materials.push(plane.mat_idx as u64);
         }
 
         plane_materials[0] = (255 << 16) + (128 << 8) + 255;
@@ -512,18 +512,18 @@ impl GPUScene
 
         let mut quad_sizes: Vec<f32> = Vec::with_capacity(scene.quads.len());
         let mut quad_inv_transforms: Vec<Mat4> = Vec::with_capacity(scene.quads.len());
-        let mut quad_materials: Vec<u32> = Vec::with_capacity(scene.quads.len());
+        let mut quad_materials: Vec<u64> = Vec::with_capacity(scene.quads.len());
         for quad in &scene.quads
         {
             quad_sizes.push(quad.size);
             quad_inv_transforms.push(quad.inv_t);
-            quad_materials.push(quad.mat_idx as u32);
+            quad_materials.push(quad.mat_idx as u64);
         }
 
-        quad_materials[0] = (255 << 16) + (255 << 8) + 255;
-        quad_materials[1] = (255 << 16) + (255 << 8) + 255;
-        quad_materials[2] = (255 << 16) + (255 << 8) + 255;
-        quad_materials[3] = (255 << 16) + (255 << 8) + 255;
+        quad_materials[0] = (255 << 16) + (255 << 8) + 255 + (1 << 61);
+        quad_materials[1] = (255 << 16) + (255 << 8) + 255 + (1 << 61);
+        quad_materials[2] = (255 << 16) + (255 << 8) + 255 + (1 << 61);
+        quad_materials[3] = (255 << 16) + (255 << 8) + 255 + (1 << 61);
 
         let mut mesh_offsets: Vec<u32> = Vec::with_capacity(scene.meshes.len());
         let mut mesh_triangle_offsets: Vec<u32> = Vec::with_capacity(scene.meshes.len());
@@ -534,7 +534,7 @@ impl GPUScene
         let mut mesh_left_firsts: Vec<u32> = Vec::with_capacity(scene.meshes.len());
         let mut mesh_triangles: Vec<Triangle> = Vec::with_capacity(scene.meshes.len());
         let mut mesh_triangle_normals: Vec<Float3> = Vec::with_capacity(scene.meshes.len());
-        let mut mesh_materials: Vec<u32> = Vec::with_capacity(scene.meshes.len());
+        let mut mesh_materials: Vec<u64> = Vec::with_capacity(scene.meshes.len());
 
         let mut mesh_offset = 0;
         let mut triangle_offset = 0;
@@ -560,10 +560,11 @@ impl GPUScene
             }
             mesh_triangle_offsets.push(triangle_offset);
             triangle_offset += mesh.bvh_4.triangle_idx.len() as u32;
-            mesh_materials.push(mesh.mat_idx as u32);
+            mesh_materials.push(mesh.mat_idx as u64);
         }
 
         mesh_materials[0] = (255 << 16);
+        mesh_materials[1] = (255 << 8);
 
         let sphere_positions = OpenCLBuffer::read_write(cl, sphere_positions);
         let sphere_radi = OpenCLBuffer::read_write(cl, sphere_radi);

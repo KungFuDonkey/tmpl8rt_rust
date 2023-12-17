@@ -99,9 +99,8 @@ void intersect_meshes(
     float* ray_t,
     float3* ray_origin,
     float3* ray_direction,
-    float3* ray_intersection,
     float3* ray_normal,
-    uint* ray_material,
+    ulong* ray_material,
     uint num_meshes,
     uint* mesh_offsets,
     uint* mesh_triangle_offsets,
@@ -112,7 +111,7 @@ void intersect_meshes(
     uint* mesh_left_firsts,
     struct triangle* mesh_triangles,
     float3* mesh_triangle_normals,
-    uint* mesh_materials
+    ulong* mesh_materials
     )
 {
 
@@ -131,7 +130,6 @@ void intersect_meshes(
         }
 
         *ray_material = mesh_materials[i];
-        *ray_intersection = *ray_t * *ray_direction + *ray_origin;
         float3 normal = mesh_triangle_normals[triangle_offset + ray_tri_idx];
         *ray_normal = dot(normal, *ray_direction) > 0.0f ? -normal : normal;
     }

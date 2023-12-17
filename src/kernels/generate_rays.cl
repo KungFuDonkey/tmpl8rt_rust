@@ -10,9 +10,10 @@ __kernel void generate_rays(
     __global float* ts,
     __global float3* origins,
     __global float3* directions,
-    __global float3* intersections,
     __global float3* normals,
-    __global uint* materials)
+    __global ulong* materials,
+    __global float3* ray_colors,
+    __global float3* ray_lights)
 {
     uint x = get_global_id(0);
     uint y = get_global_id(1);
@@ -28,7 +29,8 @@ __kernel void generate_rays(
     ts[idx] = 1e30f;
     origins[idx] = cam_position;
     directions[idx] = d;
-    intersections[idx] = d; // set to something
     normals[idx] = d; // set to something
-    materials[idx] = MAX_UINT;
+    materials[idx] = MAX_ULONG;
+    ray_colors[idx] = (float3)1;
+    ray_lights[idx] = (float3)0;
 }

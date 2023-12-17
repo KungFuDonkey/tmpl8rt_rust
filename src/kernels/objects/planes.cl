@@ -20,13 +20,12 @@ void intersect_planes(
     float* ray_t,
     float3* ray_origin,
     float3* ray_direction,
-    float3* ray_intersection,
     float3* ray_normal,
-    uint* ray_material,
+    ulong* ray_material,
     uint num_planes,
     float3* plane_normals,
     float* plane_distances,
-    uint* plane_materials)
+    ulong* plane_materials)
 {
     for (uint i = 0; i < num_planes; i++)
     {
@@ -39,7 +38,6 @@ void intersect_planes(
         }
 
         *ray_material = plane_materials[i];
-        *ray_intersection = *ray_t * *ray_direction + *ray_origin;
         float3 normal = plane_normal;
         *ray_normal = dot(normal, *ray_direction) > 0.0f ? -normal : normal;
     }
