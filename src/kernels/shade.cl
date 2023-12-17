@@ -15,12 +15,9 @@ __kernel void shade(
     __global ulong* materials,
     __global float3* ray_colors,
     __global float3* ray_lights,
-    __global float3* ray_BRDFs,
     __global float* shadow_ray_ts,
     __global float3* shadow_ray_origins,
     __global float3* shadow_ray_directions,
-    __global float3* shadow_light_normals,
-    __global float* shadow_light_areas,
     __global float3* shadow_light_colors,
     uint num_quads,
     __global float* quad_sizes,
@@ -60,11 +57,12 @@ __kernel void shade(
     {
         // todo remove when wavefront
         ts[idx] = -1.0f;
+        shadow_ray_ts[idx] = -1.0f;
+        ray_lights[idx] += ray_color * color * emission_strength;
         return;
     }
 
     float3 BRDF = color * INV_PI;
-    ray_BRDFs[idx] = BRDF;
 
     float3 normal = normals[idx];
     float3 ray_origin = origins[idx];
@@ -73,28 +71,28 @@ __kernel void shade(
 
     // todo create shadow rays for nee
     {
-        uint random_quad = random_uint(&seed);
+        uint random_quad = random_uint(&seed) % num_quads;
         float quad_size = quad_sizes[random_quad];
         struct mat4 quad_inv_transform = quad_inv_transforms[random_quad];
         struct mat4 quad_transform = invert_mat4(&quad_inv_transform);
         float3 quad_point = random_point_on_quad(&quad_inv_transform, &quad_size, &seed);
-        float3 shadow_ray_dir = intersection - quad_point;
+        float3 shadow_ray_dir = quad_point - intersection;
         float3 quad_normal = (float3)(-quad_transform.cell[1], -quad_transform.cell[5], -quad_transform.cell[9]);
         float shadow_ray_t = -1.0f;
-        if (dot(normal, shadow_ray_dir) > 0.0f && dot(quad_normal, -shadow_ray_dir)> 0.0f)
+        if (dot(normal, shadow_ray_dir) > 0.0f && dot(quad_normal, -shadow_ray_dir) > 0.0f)
         {
             shadow_ray_t = length(shadow_ray_dir);
             shadow_ray_dir = normalize(shadow_ray_dir);
             ulong quad_material = quad_materials[random_quad];
             float3 quad_color = (float3)0;
             float quad_emission_strength = 0;
-            get_material_properties(material, &quad_color, &quad_emission_strength);
+            get_material_properties(quad_material, &quad_color, &quad_emission_strength);
             shadow_ray_origins[idx] = intersection;
             shadow_ray_directions[idx] = shadow_ray_dir;
-            shadow_light_normals[idx] = quad_normal;
-            shadow_light_areas[idx] = quad_size * quad_size;
+
             // todo include emission strength?
-            shadow_light_colors[idx] = quad_color;
+            float lightPDF = (shadow_ray_t * shadow_ray_t) / (dot(quad_normal, -shadow_ray_dir)); // todo change
+            shadow_light_colors[idx] = ray_color * quad_color * quad_emission_strength * BRDF * (dot(normal, shadow_ray_dir) / lightPDF);
         }
         shadow_ray_ts[idx] = shadow_ray_t;
     }
@@ -103,7 +101,7 @@ __kernel void shade(
     float survival_chance = 1.0f;
 
     // russian roulette, start after 2 bounces
-    if (num_bounces > 1)
+    if (num_bounces > 3)
     {
         survival_chance = clamp(max(max(ray_color.x, ray_color.y), ray_color.z), 0.1f, 0.9f);
         if (survival_chance < random_float(&seed))
@@ -114,12 +112,12 @@ __kernel void shade(
         }
     }
 
-    //float3 new_direction = normalize(normal + random_direction(&seed));
+    float3 new_direction = normalize(normal + random_direction(&seed));
 
-    float3 new_direction = normalize(random_hemisphere_direction(&normal, &seed));
+    //float3 new_direction = normalize(random_hemisphere_direction(&normal, &seed));
 
     ts[idx] = 1e30;
     origins[idx] = intersection;
     directions[idx] = new_direction;
-    ray_colors[idx] = (dot(normal, new_direction) / HEMISPHERE_PDF) * BRDF;
+    ray_colors[idx] = (1.0f / survival_chance) * PI * BRDF;
 }
