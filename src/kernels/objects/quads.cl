@@ -74,3 +74,23 @@ float3 random_point_on_quad(
     return corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1);
 }
 
+float3 random_point_on_quad_blue_noise(
+    struct mat4* quad_inv_transform,
+    float* quad_size,
+    __constant uchar* blue_noise_texture,
+    uint frame_idx,
+    uint pixel_x,
+    uint pixel_y
+)
+{
+    struct mat4 quad_transform = invert_mat4(quad_inv_transform);
+    float3 sized_corner1 = (float3)(-*quad_size, 0.0, -*quad_size);
+    float3 sized_corner2 = (float3)(*quad_size, 0.0, -*quad_size);
+    float3 sized_corner3 = (float3)(*quad_size, 0.0, *quad_size);
+    float3 corner1 = transform_position(&sized_corner1, &quad_transform);
+    float3 corner2 = transform_position(&sized_corner2, &quad_transform);
+    float3 corner3 = transform_position(&sized_corner3, &quad_transform);
+
+    float2 random_point = random_blue_noise_point(blue_noise_texture, frame_idx, pixel_x, pixel_y);
+    return corner1 + random_point.x * (corner2 - corner1) + random_point.y * (corner3 - corner1);
+}

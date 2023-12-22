@@ -18,6 +18,7 @@ mod obj_loader;
 mod bitvec;
 mod opencl;
 mod gpu_renderer;
+mod blue_noise;
 
 use surface::*;
 use crate::opengl::{draw_quad, GLTexture, Shader, TextureType};

@@ -12,3 +12,6 @@
 #define MAT_TYPE_LINEAR_COLOR (0)
 #define MAT_TYPE_LIGHT (1)
 
+#define GOLDEN_RATIO 0.61803398875f
+
+#define MAX_BOUNCES 10

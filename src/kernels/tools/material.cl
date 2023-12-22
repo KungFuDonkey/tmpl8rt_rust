@@ -12,6 +12,6 @@ void get_material_properties(ulong material, float3* color, float* emission_stre
     }
     if (mat_type == MAT_TYPE_LIGHT)
     {
-        *emission_strength = 2.0f;
+        *emission_strength = 4.0f;
     }
 }

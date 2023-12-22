@@ -7,6 +7,9 @@
 __kernel void shade(
     uint glob_seed,
     uint num_bounces,
+    uint rendered_frames,
+    uint screen_width,
+    __constant uchar* blue_noise_texture,
     volatile __global uint* num_rays,
     __global uint* write_back_ids,
     __global float* ts,
@@ -66,13 +69,17 @@ __kernel void shade(
     float3 ray_direction = directions[idx];
     float3 intersection = ray_origin + ray_direction * (t - EPSILON);
 
-    // todo create shadow rays for nee
+    // shadow rays
     {
+        uint pixel_x = write_back_idx % screen_width;
+        uint pixel_y = write_back_idx / screen_width;
+        uint frame_idx = rendered_frames * MAX_BOUNCES + num_bounces;
         uint random_quad = random_uint(&seed) % num_quads;
         float quad_size = quad_sizes[random_quad];
         struct mat4 quad_inv_transform = quad_inv_transforms[random_quad];
         struct mat4 quad_transform = invert_mat4(&quad_inv_transform);
-        float3 quad_point = random_point_on_quad(&quad_inv_transform, &quad_size, &seed);
+        //float3 quad_point = random_point_on_quad(&quad_inv_transform, &quad_size, &seed);
+        float3 quad_point = random_point_on_quad_blue_noise(&quad_inv_transform, &quad_size, blue_noise_texture, frame_idx, pixel_x, pixel_y);
         float3 shadow_ray_dir = quad_point - intersection;
         float3 quad_normal = (float3)(-quad_transform.cell[1], -quad_transform.cell[5], -quad_transform.cell[9]);
         if (dot(normal, shadow_ray_dir) > 0.0f && dot(quad_normal, -shadow_ray_dir) > 0.0f)

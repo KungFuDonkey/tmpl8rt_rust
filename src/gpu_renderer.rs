@@ -4,6 +4,7 @@ use crate::opencl::*;
 use crate::math::*;
 use crate::scene::GPUScene;
 use crate::surface::{SCRHEIGHT, SCRWIDTH};
+use crate::blue_noise::load_blue_noise_from_file;
 
 pub struct GPURenderer
 {
@@ -27,6 +28,7 @@ pub struct GPURenderer
     shadow_ray_origins: OpenCLBuffer<Float3>,
     shadow_ray_directions: OpenCLBuffer<Float3>,
     shadow_light_colors: OpenCLBuffer<Float3>,
+    blue_noise_texture: OpenCLBuffer<u8>,
     seed: u32,
     rendered_frames: u32,
     num_primary_rays: usize,
@@ -116,6 +118,7 @@ impl GPURenderer
         let shadow_ray_origins = OpenCLBuffer::read_write(cl, shadow_ray_origins);
         let shadow_ray_directions = OpenCLBuffer::read_write(cl, shadow_ray_directions);
         let shadow_light_colors = OpenCLBuffer::read_write(cl, shadow_light_colors);
+        let blue_noise_texture = load_blue_noise_from_file(cl, std::path::PathBuf::from("./assets/blue_noise.png"));
 
         generate_rays_kernel.set_argument(1, SCRWIDTH as u32);
         generate_rays_kernel.set_argument(2, SCRHEIGHT as u32);
@@ -136,21 +139,22 @@ impl GPURenderer
         extend_kernel.set_argument(5, &normals);
         extend_kernel.set_argument(6, &materials);
 
-        shade_kernel.set_argument(1, num_bounces as u32);
-        shade_kernel.set_argument(2, &num_rays);
-        shade_kernel.set_argument(3, &write_back_ids);
-        shade_kernel.set_argument(4, &ts);
-        shade_kernel.set_argument(5, &origins);
-        shade_kernel.set_argument(6, &directions);
-        shade_kernel.set_argument(7, &normals);
-        shade_kernel.set_argument(8, &materials);
-        shade_kernel.set_argument(9, &ray_colors);
-        shade_kernel.set_argument(10, &ray_lights);
-        shade_kernel.set_argument(11, &shadow_write_back_ids);
-        shade_kernel.set_argument(12, &shadow_ray_ts);
-        shade_kernel.set_argument(13, &shadow_ray_origins);
-        shade_kernel.set_argument(14, &shadow_ray_directions);
-        shade_kernel.set_argument(15, &shadow_light_colors);
+        shade_kernel.set_argument(3, SCRWIDTH as u32);
+        shade_kernel.set_argument(4, &blue_noise_texture);
+        shade_kernel.set_argument(5, &num_rays);
+        shade_kernel.set_argument(6, &write_back_ids);
+        shade_kernel.set_argument(7, &ts);
+        shade_kernel.set_argument(8, &origins);
+        shade_kernel.set_argument(9, &directions);
+        shade_kernel.set_argument(10, &normals);
+        shade_kernel.set_argument(11, &materials);
+        shade_kernel.set_argument(12, &ray_colors);
+        shade_kernel.set_argument(13, &ray_lights);
+        shade_kernel.set_argument(14, &shadow_write_back_ids);
+        shade_kernel.set_argument(15, &shadow_ray_ts);
+        shade_kernel.set_argument(16, &shadow_ray_origins);
+        shade_kernel.set_argument(17, &shadow_ray_directions);
+        shade_kernel.set_argument(18, &shadow_light_colors);
 
         connect_kernel.set_argument(0, num_bounces as u32);
         connect_kernel.set_argument(1, &num_rays);
@@ -193,6 +197,7 @@ impl GPURenderer
             shadow_light_colors,
             seed,
             num_primary_rays,
+            blue_noise_texture,
             num_bounces: num_bounces as u32,
             rendered_frames: 1
         }
@@ -224,10 +229,10 @@ impl GPURenderer
         self.extend_kernel.set_argument(28, &scene.mesh_triangle_normals);
         self.extend_kernel.set_argument(29, &scene.mesh_materials);
 
-        self.shade_kernel.set_argument(16, scene.quad_sizes.host_buffer.len() as u32);
-        self.shade_kernel.set_argument(17, &scene.quad_sizes);
-        self.shade_kernel.set_argument(18, &scene.quad_inv_transforms);
-        self.shade_kernel.set_argument(19, &scene.quad_materials);
+        self.shade_kernel.set_argument(19, scene.quad_sizes.host_buffer.len() as u32);
+        self.shade_kernel.set_argument(20, &scene.quad_sizes);
+        self.shade_kernel.set_argument(21, &scene.quad_inv_transforms);
+        self.shade_kernel.set_argument(22, &scene.quad_materials);
 
         self.connect_kernel.set_argument(8, scene.sphere_positions.host_buffer.len() as u32);
         self.connect_kernel.set_argument(9, &scene.sphere_positions);
@@ -263,6 +268,7 @@ impl GPURenderer
         random_uint_s(&mut self.seed);
 
         self.generate_rays_kernel.run2d(cl, SCRWIDTH, SCRHEIGHT);
+        self.shade_kernel.set_argument(2, self.rendered_frames);
         self.finalize_kernel.set_argument(0, self.rendered_frames);
 
         for bounces in 0u32..self.num_bounces
