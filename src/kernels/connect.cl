@@ -4,7 +4,9 @@
 
 
 void __kernel connect(
-    uint num_shadow_rays,
+    uint num_bounces,
+    volatile __global uint* num_rays,
+    __global uint* shadow_write_back_ids,
     __global float3* ray_lights,
     __global float* shadow_ray_ts,
     __global float3* shadow_ray_origins,
@@ -27,20 +29,15 @@ void __kernel connect(
     __global struct triangle* mesh_triangles
 )
 {
-    int idx = get_global_id(0);
-    if (idx >= num_shadow_rays)
+    uint idx = get_global_id(0);
+    uint max_idx = num_rays[num_bounces * 2 + 1];
+
+    if (idx >= max_idx)
     {
         return;
     }
 
     float ray_t = shadow_ray_ts[idx];
-
-    if (ray_t < 0)
-    {
-        // todo remove when wavefront
-        return;
-    }
-
     float3 ray_origin = shadow_ray_origins[idx];
     float3 ray_direction = shadow_ray_directions[idx];
 
@@ -56,5 +53,7 @@ void __kernel connect(
 
     float3 new_light = shadow_light_colors[idx];
 
-    ray_lights[idx] += new_light;
+    uint write_back_idx = shadow_write_back_ids[idx];
+
+    ray_lights[write_back_idx] += new_light;
 }

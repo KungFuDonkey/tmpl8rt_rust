@@ -4,7 +4,8 @@
 #include "src/kernels/objects/meshes.cl"
 
 __kernel void extend(
-    uint num_rays,
+    uint num_bounces,
+    volatile __global uint* num_rays,
     __global float* ts,
     __global float3* origins,
     __global float3* directions,
@@ -34,19 +35,14 @@ __kernel void extend(
     __global float3* mesh_triangle_normals,
     __global ulong* mesh_materials)
 {
-    int idx = get_global_id(0);
-    if (idx >= num_rays)
+    uint idx = get_global_id(0);
+    uint max_idx = num_rays[num_bounces * 2];
+    if (idx >= max_idx)
     {
         return;
     }
 
     float ray_t = ts[idx];
-
-    // todo remove as there will be no dead rays in the future
-    if (ray_t < 0)
-    {
-        return;
-    }
 
     float original_ray_t = ray_t;
     float3 ray_origin = origins[idx];

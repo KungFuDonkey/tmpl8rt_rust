@@ -9,6 +9,7 @@ __kernel void generate_rays(
     float3 cam_top_left,
     float3 cam_bottom_left,
     float3 cam_top_right,
+    __global uint* write_back_ids,
     __global float* ts,
     __global float3* origins,
     __global float3* directions,
@@ -37,6 +38,7 @@ __kernel void generate_rays(
 
     uint idx = x + y * screen_width;
 
+    write_back_ids[idx] = idx;
     ts[idx] = 1e30f;
     origins[idx] = cam_position;
     directions[idx] = d;

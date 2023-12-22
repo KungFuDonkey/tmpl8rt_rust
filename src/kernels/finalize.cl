@@ -11,15 +11,15 @@ __kernel void finalize(
     float3 accumulated_color = accumulator[idx];
     float3 rendered_color = colors[idx];
 
-    float weight = 1.0f / (float)(rendered_frames);
-    float3 new_color = accumulated_color * (1 - weight) + rendered_color * weight;
-
     float3 one = (float3)1;
-    float3 ranged_color = min(new_color, one) * 255.0f;
+    float3 ranged_color = min(rendered_color, one) * 255.0f;
 
-    uint r = (uint)ranged_color.x;
-    uint g = (uint)ranged_color.y;
-    uint b = (uint)ranged_color.z;
+    float weight = 1.0f / (float)(rendered_frames);
+    float3 new_color = accumulated_color * (1 - weight) + ranged_color * weight;
+
+    uint r = (uint)new_color.x;
+    uint g = (uint)new_color.y;
+    uint b = (uint)new_color.z;
 
     output_buffer[idx] = (r << 16) + (g << 8) + b;
     accumulator[idx] = new_color;

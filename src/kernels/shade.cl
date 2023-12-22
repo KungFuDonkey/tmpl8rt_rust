@@ -7,7 +7,8 @@
 __kernel void shade(
     uint glob_seed,
     uint num_bounces,
-    uint num_rays,
+    volatile __global uint* num_rays,
+    __global uint* write_back_ids,
     __global float* ts,
     __global float3* origins,
     __global float3* directions,
@@ -15,6 +16,7 @@ __kernel void shade(
     __global ulong* materials,
     __global float3* ray_colors,
     __global float3* ray_lights,
+    __global uint* shadow_write_back_ids,
     __global float* shadow_ray_ts,
     __global float3* shadow_ray_origins,
     __global float3* shadow_ray_directions,
@@ -25,8 +27,10 @@ __kernel void shade(
     __global ulong* quad_materials
     )
 {
-    int idx = get_global_id(0);
-    if (idx >= num_rays)
+    uint idx = get_global_id(0);
+    uint max_idx = num_rays[num_bounces * 2];
+
+    if (idx >= max_idx)
     {
         return;
     }
@@ -37,8 +41,6 @@ __kernel void shade(
     // no hit
     if (t == 1e30 || t == -1.0f)
     {
-        // todo remove when wavefront
-        ts[idx] = -1.0f;
         return;
     }
 
@@ -47,18 +49,13 @@ __kernel void shade(
     float emission_strength = 0;
     get_material_properties(material, &color, &emission_strength);
 
-    //float3 emitted_light = color * emission_strength;
     float3 ray_color = ray_colors[idx];
-    //float3 ray_light = ray_lights[idx] + emitted_light * ray_color;
-    //ray_lights[idx] = ray_light;
+    uint write_back_idx = write_back_ids[idx];
 
     // hit a light
     if (emission_strength > 0.0f)
     {
-        // todo remove when wavefront
-        ts[idx] = -1.0f;
-        shadow_ray_ts[idx] = -1.0f;
-        ray_lights[idx] += ray_color * color * emission_strength;
+        ray_lights[write_back_idx] += ray_color * color * emission_strength;
         return;
     }
 
@@ -78,23 +75,26 @@ __kernel void shade(
         float3 quad_point = random_point_on_quad(&quad_inv_transform, &quad_size, &seed);
         float3 shadow_ray_dir = quad_point - intersection;
         float3 quad_normal = (float3)(-quad_transform.cell[1], -quad_transform.cell[5], -quad_transform.cell[9]);
-        float shadow_ray_t = -1.0f;
         if (dot(normal, shadow_ray_dir) > 0.0f && dot(quad_normal, -shadow_ray_dir) > 0.0f)
         {
-            shadow_ray_t = length(shadow_ray_dir);
+            float shadow_ray_t = length(shadow_ray_dir);
             shadow_ray_dir = normalize(shadow_ray_dir);
             ulong quad_material = quad_materials[random_quad];
             float3 quad_color = (float3)0;
             float quad_emission_strength = 0;
             get_material_properties(quad_material, &quad_color, &quad_emission_strength);
-            shadow_ray_origins[idx] = intersection;
-            shadow_ray_directions[idx] = shadow_ray_dir;
 
-            // todo include emission strength?
+            uint shadow_ray_idx = atomic_inc(num_rays + num_bounces * 2 + 1);
+
+            shadow_ray_origins[shadow_ray_idx] = intersection;
+            shadow_ray_directions[shadow_ray_idx] = shadow_ray_dir;
+
             float lightPDF = (shadow_ray_t * shadow_ray_t) / (dot(quad_normal, -shadow_ray_dir)); // todo change
-            shadow_light_colors[idx] = ray_color * quad_color * quad_emission_strength * BRDF * (dot(normal, shadow_ray_dir) / lightPDF);
+            shadow_light_colors[shadow_ray_idx] = ray_color * quad_color * quad_emission_strength * BRDF * (dot(normal, shadow_ray_dir) / lightPDF);
+
+            shadow_ray_ts[shadow_ray_idx] = shadow_ray_t;
+            shadow_write_back_ids[shadow_ray_idx] = write_back_idx;
         }
-        shadow_ray_ts[idx] = shadow_ray_t;
     }
 
     float survival_chance = 1.0f;
@@ -105,8 +105,6 @@ __kernel void shade(
         survival_chance = clamp(max(max(ray_color.x, ray_color.y), ray_color.z), 0.1f, 0.9f);
         if (survival_chance < random_float(&seed))
         {
-            // todo remove when wavefront
-            ts[idx] = -1.0f;
             return;
         }
     }
@@ -115,8 +113,11 @@ __kernel void shade(
 
     //float3 new_direction = normalize(random_hemisphere_direction(&normal, &seed));
 
-    ts[idx] = 1e30;
-    origins[idx] = intersection;
-    directions[idx] = new_direction;
-    ray_colors[idx] = ray_color * (1.0f / survival_chance) * PI * BRDF;
+    uint new_ray_idx = atomic_inc(num_rays + (num_bounces * 2) + 2);
+
+    write_back_ids[new_ray_idx] = write_back_idx;
+    ts[new_ray_idx] = 1e30;
+    origins[new_ray_idx] = intersection;
+    directions[new_ray_idx] = new_direction;
+    ray_colors[new_ray_idx] = ray_color * (1.0f / survival_chance) * PI * BRDF;
 }
