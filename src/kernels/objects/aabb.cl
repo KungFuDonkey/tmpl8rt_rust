@@ -1,3 +1,4 @@
+#pragma once
 
 float intersect_aabb(
     float* ray_t,

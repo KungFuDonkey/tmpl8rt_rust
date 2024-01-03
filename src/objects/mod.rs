@@ -9,3 +9,4 @@ pub mod grid;
 pub mod triangle;
 mod aabb;
 pub mod kd_tree;
+pub mod fluid;

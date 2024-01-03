@@ -2,6 +2,7 @@
 #include "src/kernels/objects/planes.cl"
 #include "src/kernels/objects/quads.cl"
 #include "src/kernels/objects/meshes.cl"
+#include "src/kernels/objects/fluids.cl"
 
 __kernel void extend(
     uint num_bounces,
@@ -33,7 +34,15 @@ __kernel void extend(
     __global uint* mesh_left_firsts,
     __global struct triangle* mesh_triangles,
     __global float3* mesh_triangle_normals,
-    __global ulong* mesh_materials)
+    __global ulong* mesh_materials,
+    uint num_fluids,
+    __global uint* fluid_particle_offsets,
+    __global float3* fluid_min_bounds,
+    __global float3* fluid_max_bounds,
+    __global uint* fluid_particle_counts,
+    __global uint* fluid_particle_ids,
+    __global float3* fluid_particle_positions,
+    __global float3* fluid_particle_colors)
 {
     uint idx = get_global_id(0);
     uint max_idx = num_rays[num_bounces * 2];
@@ -54,6 +63,7 @@ __kernel void extend(
     intersect_planes(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, num_planes, plane_normals, plane_distances, plane_materials);
     intersect_quads(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, num_quads, quad_sizes, quad_inv_transforms, quad_materials);
     intersect_meshes(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, num_meshes, mesh_offsets, mesh_triangle_offsets, mesh_inv_transforms, mesh_min_bounds, mesh_max_bounds, mesh_tri_counts, mesh_left_firsts, mesh_triangles, mesh_triangle_normals, mesh_materials);
+    intersect_fluids(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, num_fluids, fluid_particle_offsets, fluid_min_bounds, fluid_max_bounds, fluid_particle_counts, fluid_particle_ids, fluid_particle_positions, fluid_particle_colors);
 
     if (ray_t >= original_ray_t)
     {

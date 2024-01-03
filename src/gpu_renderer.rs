@@ -228,6 +228,15 @@ impl GPURenderer
         self.extend_kernel.set_argument(27, &scene.mesh_triangles);
         self.extend_kernel.set_argument(28, &scene.mesh_triangle_normals);
         self.extend_kernel.set_argument(29, &scene.mesh_materials);
+        self.extend_kernel.set_argument(30, scene.fluid_system.particle_offsets.host_buffer.len() as u32);
+        self.extend_kernel.set_argument(31, &scene.fluid_system.particle_offsets);
+        self.extend_kernel.set_argument(32, &scene.fluid_system.min_bounds);
+        self.extend_kernel.set_argument(33, &scene.fluid_system.max_bounds);
+        self.extend_kernel.set_argument(34, &scene.fluid_system.particle_counts);
+        self.extend_kernel.set_argument(35, &scene.fluid_system.particle_ids);
+        self.extend_kernel.set_argument(36, &scene.fluid_system.particle_positions);
+        self.extend_kernel.set_argument(37, &scene.fluid_system.particle_colors);
+
 
         self.shade_kernel.set_argument(19, scene.quad_sizes.host_buffer.len() as u32);
         self.shade_kernel.set_argument(20, &scene.quad_sizes);

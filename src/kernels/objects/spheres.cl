@@ -1,3 +1,4 @@
+#pragma once
 #include "src/kernels/tools/constants.cl"
 
 bool intersect_sphere(

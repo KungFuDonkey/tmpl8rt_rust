@@ -9,6 +9,7 @@ use crate::objects::torus::*;
 use crate::objects::quad::*;
 use crate::objects::mesh::*;
 use crate::objects::triangle::*;
+use crate::objects::fluid::*;
 use crate::obj_loader::*;
 use crate::opencl::{OpenCL, OpenCLBuffer};
 
@@ -466,7 +467,8 @@ pub struct GPUScene
     pub mesh_left_firsts: OpenCLBuffer<u32>,
     pub mesh_triangles: OpenCLBuffer<Triangle>,
     pub mesh_triangle_normals: OpenCLBuffer<Float3>,
-    pub mesh_materials: OpenCLBuffer<u64>
+    pub mesh_materials: OpenCLBuffer<u64>,
+    pub fluid_system: FluidSystem
 }
 
 impl GPUScene
@@ -626,7 +628,8 @@ impl GPUScene
             mesh_left_firsts,
             mesh_triangles,
             mesh_triangle_normals,
-            mesh_materials
+            mesh_materials,
+            fluid_system: FluidSystem::new(cl)
         }
     }
 }

@@ -29,7 +29,6 @@ use imgui_glfw_rs::glfw::*;
 use imgui_glfw_rs::imgui;
 use imgui_glfw_rs::ImguiGLFW;
 use input::Input;
-use crate::opencl::{get_cl_platform_info, OpenCL, OpenCLKernel, OpenCLProgram};
 
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
