@@ -2,6 +2,7 @@
 #include "src/kernels/objects/spheres.cl"
 
 #define PARTICLE_RADIUS 0.006f
+#define PARTICLE_RADIUS 0.006f
 #define PARTICLE_RADIUS_2 (PARTICLE_RADIUS * PARTICLE_RADIUS)
 #define PARTICLE_INV_RADIUS (1.0f / PARTICLE_RADIUS)
 
@@ -21,7 +22,7 @@ bool intersect_fluid(
         float t = intersect_aabb(ray_t, ray_origin, ray_direction, fluid_min_bound, fluid_max_bound);
         if (t == 1e30)
         {
-            return false;
+            //return false;
         }
     }
 

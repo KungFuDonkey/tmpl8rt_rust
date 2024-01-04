@@ -85,6 +85,7 @@ impl Application
         self.internal_timer.reset();
         if self.use_gpu
         {
+            self.gpu_scene.fluid_system.simulate(&self.cl, delta_time);
             self.gpu_renderer.render(&self.cl, &self.gpu_scene, &self.camera);
         }
         else
