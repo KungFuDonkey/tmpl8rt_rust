@@ -57,6 +57,23 @@ void intersect_quads(
     }
 }
 
+float3 quad_centre(
+    struct mat4* quad_inv_transform,
+    float* quad_size
+)
+{
+    struct mat4 quad_transform = invert_mat4(quad_inv_transform);
+    float3 sized_corner1 = (float3)(-*quad_size, 0.0, -*quad_size);
+    float3 sized_corner2 = (float3)(*quad_size, 0.0, -*quad_size);
+    float3 sized_corner3 = (float3)(*quad_size, 0.0, *quad_size);
+    float3 corner1 = transform_position(&sized_corner1, &quad_transform);
+    float3 corner2 = transform_position(&sized_corner2, &quad_transform);
+    float3 corner3 = transform_position(&sized_corner3, &quad_transform);
+    float r1 = 0.5f;
+    float r2 = 0.5f;
+    return corner1 + r2 * (corner2 - corner1) + r1 * (corner3 - corner1);
+}
+
 float3 random_point_on_quad(
     struct mat4* quad_inv_transform,
     float* quad_size,

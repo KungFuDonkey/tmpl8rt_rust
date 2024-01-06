@@ -6,44 +6,67 @@
 #define PARTICLE_RADIUS_2 (PARTICLE_RADIUS * PARTICLE_RADIUS)
 #define PARTICLE_INV_RADIUS (1.0f / PARTICLE_RADIUS)
 
-bool intersect_fluid(
+void intersect_fluid(
     float* ray_t,
     float3* ray_origin,
     float3* ray_direction,
-    uint* ray_particle_idx,
-    float3* fluid_min_bound,
-    float3* fluid_max_bound,
-    uint fluid_particle_count,
-    uint* fluid_particle_ids,
-    float3* fluid_particle_positions
+    float3* ray_normal,
+    ulong* ray_material,
+    uint fluid_num_particles,
+    struct mat4* local_to_world,
+    struct mat4* world_to_local,
+    float3* particle_positions,
+    float3* particle_velocities,
+    float3* particle_densities
 )
 {
-    {
-        float t = intersect_aabb(ray_t, ray_origin, ray_direction, fluid_min_bound, fluid_max_bound);
-        if (t == 1e30)
-        {
-            //return false;
-        }
-    }
+    //{
+    //    float t = intersect_aabb(ray_t, ray_origin, ray_direction, fluid_min_bound, fluid_max_bound);
+    //    if (t == 1e30)
+    //    {
+    //        //return false;
+    //    }
+    //}
 
     float particle_radius_2 = PARTICLE_RADIUS_2;
 
+    uint particle_idx = 0;
     // todo do grid based intersection
     bool intersected = false;
-    for (uint i = 0; i < fluid_particle_count; i++)
+    for (uint i = 0; i < fluid_num_particles; i++)
     {
-        float3 particle_position = fluid_particle_positions[i];
+        float3 particle_position = particle_positions[i];
         if (intersect_sphere(ray_t, ray_origin, ray_direction, &particle_position, &particle_radius_2))
         {
             intersected = true;
-            *ray_particle_idx = i;
+            particle_idx = i;
         }
     }
-    return intersected;
+
+
+    if (intersected)
+    {
+        float3 particle_position = particle_positions[particle_idx];
+
+        float3 velocity = particle_velocities[particle_idx];
+        float speed = length(velocity);
+
+        if (speed <= 0)
+        {
+            *ray_material = (128 << 16) + (128 << 8) + 255;
+        }
+        else
+        {
+            *ray_material = (255 << 16);
+        }
+
+        float3 intersection = *ray_t * *ray_direction + *ray_origin;
+        *ray_normal = (intersection - particle_position) * PARTICLE_INV_RADIUS;
+    }
 }
 
 
-void intersect_fluids(
+/*void intersect_fluids(
     float* ray_t,
     float3* ray_origin,
     float3* ray_direction,
@@ -73,9 +96,9 @@ void intersect_fluids(
         }
 
         float3 particle_position = fluid_particle_positions[particle_offset + ray_particle_idx];
-        *ray_material = (128 << 16) + (128 << 8) + 255;
+        *ray_material = (200 << 24) + (128 << 16) + (128 << 8) + 255;
         float3 intersection = *ray_t * *ray_direction + *ray_origin;
         *ray_normal = (intersection - particle_position) * PARTICLE_INV_RADIUS;
     }
 
-}
+}*/

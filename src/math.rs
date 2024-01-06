@@ -1305,7 +1305,7 @@ pub fn cross<T>(a: &T, b: &T) -> T
 }
 
 #[repr(C, align(64))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Mat4
 {
     pub cell: [f32; 16]

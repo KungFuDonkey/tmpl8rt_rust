@@ -4,7 +4,7 @@ use crate::scene::{GPUScene, Scene};
 use crate::timer::{FrameTimer,Timer};
 use imgui_glfw_rs::imgui::Ui;
 use imgui_glfw_rs::imgui::ImString;
-use crate::gpu_renderer::GPURenderer;
+use crate::gpu_renderer::{GPURenderer, GPURenderMode};
 use crate::input::Input;
 use crate::renderer::{ComplexityMode, LightingMode, Renderer, RenderMode};
 use crate::objects::mesh::MeshIntersectionSetting;
@@ -138,6 +138,11 @@ impl Application
             }
         }
 
+        if input.is_key_pressed(glfw::Key::P)
+        {
+            self.gpu_scene.fluid_system.settings.paused = !self.gpu_scene.fluid_system.settings.paused;
+        }
+
         if !self.is_rendering
         {
             return;
@@ -179,6 +184,24 @@ impl Application
         }
 
 
+        if self.use_gpu
+        {
+            ui.text(ImString::new("Render mode:").deref());
+            ui.radio_button(ImString::new("Debug").deref(), &mut self.gpu_renderer.render_mode, GPURenderMode::Debug);
+            ui.radio_button(ImString::new("Path Tracing").deref(), &mut self.gpu_renderer.render_mode, GPURenderMode::PathTracer);
+
+            ui.text(ImString::new("Fluid").deref());
+            ui.slider_float(ImString::new("Time Scale").deref(), &mut self.gpu_scene.fluid_system.settings.time_scale, 0.0, 1.0 ).build();
+            ui.slider_float(ImString::new("Gravity").deref(), &mut self.gpu_scene.fluid_system.settings.gravity, -10.0, 10.0 ).build();
+            ui.slider_float(ImString::new("Collision Damping").deref(), &mut self.gpu_scene.fluid_system.settings.collision_damping, 0.001, 1.0).build();
+            ui.slider_float(ImString::new("Smoothing Radius").deref(), &mut self.gpu_scene.fluid_system.settings.smoothing_radius, 0.001, 1.0).build();
+            ui.slider_float(ImString::new("Target Density").deref(), &mut self.gpu_scene.fluid_system.settings.target_density, 0.001, 1000.0).build();
+            ui.slider_float(ImString::new("Pressure Multiplier").deref(), &mut self.gpu_scene.fluid_system.settings.pressure_multiplier, 0.001, 4.0).build();
+            ui.slider_float(ImString::new("Near Pressure Multiplier").deref(), &mut self.gpu_scene.fluid_system.settings.near_pressure_multiplier, 0.001, 4.0).build();
+            ui.slider_float(ImString::new("Viscosity strength").deref(), &mut self.gpu_scene.fluid_system.settings.viscosity_strength, 0.001, 0.075).build();
+
+            return;
+        }
         ui.text(ImString::new("Render mode:").deref());
         ui.radio_button(ImString::new("Ray tracing").deref(), &mut self.renderer.render_settings.render_mode, RenderMode::Standard);
         ui.radio_button(ImString::new("Normals").deref(), &mut self.renderer.render_settings.render_mode, RenderMode::Normals);

@@ -21,6 +21,11 @@ __kernel void finalize(
     uint g = (uint)new_color.y;
     uint b = (uint)new_color.z;
 
+    // todo remove for accumulated rendering
+    //r = (uint)ranged_color.x;
+    //g = (uint)ranged_color.y;
+    //b = (uint)ranged_color.z;
+
     output_buffer[idx] = (r << 16) + (g << 8) + b;
     accumulator[idx] = new_color;
 }

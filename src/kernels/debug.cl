@@ -3,8 +3,20 @@
 #include "src/kernels/objects/quads.cl"
 #include "src/kernels/objects/meshes.cl"
 #include "src/kernels/objects/fluids.cl"
+#include "src/kernels/tools/material.cl"
 
-__kernel void extend(
+void write_to_output_buffer(uint idx, uint* output_buffer, float3 color)
+{
+    float3 one = (float3)1;
+    float3 ranged_color = min(color, one) * 255.0f;
+    uint r = (uint)ranged_color.x;
+    uint g = (uint)ranged_color.y;
+    uint b = (uint)ranged_color.z;
+
+    output_buffer[idx] = (r << 16) + (g << 8) + b;
+}
+
+__kernel void debug(
     uint num_bounces,
     volatile __global uint* num_rays,
     __global float* ts,
@@ -40,7 +52,9 @@ __kernel void extend(
     struct mat4 fluid_world_to_local,
     __global float3* fluid_particle_positions,
     __global float3* fluid_particle_velocities,
-    __global float3* fluid_particle_densities)
+    __global float3* fluid_particle_densities,
+    __global uint* output_buffer
+)
 {
     uint idx = get_global_id(0);
     uint max_idx = num_rays[num_bounces * 2];
@@ -49,9 +63,7 @@ __kernel void extend(
         return;
     }
 
-    // todo ?get from ts? should this not just set it to the max again?
-    float ray_t = ts[idx];
-    float original_ray_t = ray_t;
+    float ray_t = 1e30;
     float3 ray_origin = origins[idx];
     float3 ray_direction = directions[idx];
     float3 ray_normal = (float3)0;
@@ -65,14 +77,14 @@ __kernel void extend(
     intersect_fluid(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, fluid_num_particles, &fluid_local_to_world, &fluid_world_to_local, fluid_particle_positions, fluid_particle_velocities, fluid_particle_densities);
     //intersect_fluids(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, num_fluids, fluid_particle_offsets, fluid_min_bounds, fluid_max_bounds, fluid_particle_counts, fluid_particle_ids, fluid_particle_positions, fluid_particle_colors);
 
-    if (ray_t >= original_ray_t)
+    if (ray_t >= 1e30)
     {
         return;
     }
 
-    ts[idx] = ray_t;
-    origins[idx] = ray_origin;
-    directions[idx] = ray_direction;
-    normals[idx] = ray_normal;
-    materials[idx] = ray_material;
+    float3 color = (float3)0;
+    float emission_strength = 0;
+    get_material_properties(ray_material, &color, &emission_strength);
+
+    write_to_output_buffer(idx, output_buffer, color);
 }

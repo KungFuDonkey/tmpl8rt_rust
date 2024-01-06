@@ -1,336 +1,428 @@
 #include "src/kernels/tools/constants.cl"
+#include "src/kernels/types/mat4.cl"
 
-
-#define GRAVITY ((float3)(0.0, -9.81, 0.0))
-
-float compute_density(
-    uint idx,
-    uint particle_count,
-    float* fluid_particle_mass,
-    float* fluid_particle_densities,
-    float3* fluid_particle_positions,
-    float* fluid_particle_support_radi
-)
+// ----------------------------------------- SPATIAL HASHING -----------------------------------------------
+const int3 sp_offsets[27] =
 {
-    float density = 0.0f;
-    float3 particle_position = fluid_particle_positions[idx];
-    float particle_support_radius = fluid_particle_support_radi[idx];
-    float particle_support_radius_2 = particle_support_radius * particle_support_radius;
+    (int3)(-1, -1, -1),
+	(int3)(-1, -1, 0),
+	(int3)(-1, -1, 1),
+	(int3)(-1, 0, -1),
+	(int3)(-1, 0, 0),
+	(int3)(-1, 0, 1),
+	(int3)(-1, 1, -1),
+	(int3)(-1, 1, 0),
+	(int3)(-1, 1, 1),
+	(int3)(0, -1, -1),
+	(int3)(0, -1, 0),
+	(int3)(0, -1, 1),
+	(int3)(0, 0, -1),
+	(int3)(0, 0, 0),
+	(int3)(0, 0, 1),
+	(int3)(0, 1, -1),
+	(int3)(0, 1, 0),
+	(int3)(0, 1, 1),
+	(int3)(1, -1, -1),
+	(int3)(1, -1, 0),
+	(int3)(1, -1, 1),
+	(int3)(1, 0, -1),
+	(int3)(1, 0, 0),
+	(int3)(1, 0, 1),
+	(int3)(1, 1, -1),
+	(int3)(1, 1, 0),
+	(int3)(1, 1, 1)
+};
 
-    // todo grid based operations
-    for (uint p = 0; p < particle_count; p++)
-    {
-        float3 neighbour_position = fluid_particle_positions[p];
-        float3 diff = particle_position - neighbour_position;
-        float magnitude_2 = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
-        if (magnitude_2 <= particle_support_radius_2)
-        {
-            float pow_mag = particle_support_radius_2 - magnitude_2;
-            pow_mag = pow_mag * pow_mag * pow_mag;
-            float h_mag = particle_support_radius_2 * particle_support_radius_2;
-            h_mag = h_mag * h_mag * particle_support_radius;
-            density += ((315.0f * pow_mag) / (64.0f * PI * h_mag)) * fluid_particle_mass[p];
-        }
-    }
+const uint hash1 = 15823;
+const uint hash2 = 9737333;
+const uint hash3 = 440817757;
 
-    if (density == 0.0f)
-    {
-        density = fluid_particle_mass[idx] / .00000001f;
-    }
-
-    return density;
+// Convert floating point position into an integer cell coordinate
+int3 get_cell(float3 position, float radius)
+{
+    float3 floored = floor(position / radius);
+	return (int3)((int)floored.x, (int)floored.y, (int)floored.z);
 }
 
-__kernel void compute_densities(
-    uint num_fluids,
-    __global uint* fluid_particle_offsets,
-    __global uint* fluid_particle_counts,
-    __global float* fluid_particle_mass,
-    __global float* fluid_particle_densities,
-    __global float3* fluid_particle_positions,
-    __global float* fluid_particle_support_radi
-)
+// Hash cell coordinate to a single unsigned integer
+uint hash_cell(int3 cell)
 {
-    uint idx = get_global_id(0);
-
-    for (uint i = 0; i < num_fluids; i++)
-    {
-        uint particle_count = fluid_particle_counts[i];
-        if (idx >= particle_count)
-        {
-            continue;
-        }
-
-        uint particle_offset = fluid_particle_offsets[i];
-
-        float density = compute_density(idx, particle_count, fluid_particle_mass + particle_offset, fluid_particle_densities + particle_offset, fluid_particle_positions + particle_offset, fluid_particle_support_radi + particle_offset);
-
-        fluid_particle_densities[idx + particle_offset] = density;
-    }
+	return (((uint)cell.x) * hash1) + (((uint)cell.y) * hash2) + (((uint)cell.z) * hash3);
 }
 
-float compute_pressure(
-    uint idx,
-    uint particle_count,
-    float* fluid_particle_pressures,
-    float* fluid_particle_stiffness,
-    float* fluid_particle_rest_densities,
-    float* fluid_particle_densities
-)
+uint key_from_hash(uint hash, uint tableSize)
 {
-    float stiffness = fluid_particle_stiffness[idx];
-    float density = fluid_particle_densities[idx];
-    float rest_density = fluid_particle_rest_densities[idx];
-    float mag = (density / rest_density);
-    float mag_2 = mag * mag;
-    float mag_7 = mag_2 * mag_2 * mag_2 * mag;
-    float pressure = stiffness * (mag_7 - 1.0);
-    return pressure;
+	return hash % tableSize;
 }
 
-__kernel void compute_pressures(
-    uint num_fluids,
-    __global uint* fluid_particle_offsets,
-    __global uint* fluid_particle_counts,
-    __global float* fluid_particle_pressures,
-    __global float* fluid_particle_stiffness,
-    __global float* fluid_particle_rest_densities,
-    __global float* fluid_particle_densities
-)
-{
-    uint idx = get_global_id(0);
+// ----------------------------------------- SORTING -------------------------------------------------------
 
-    for (uint i = 0; i < num_fluids; i++)
-    {
-        uint particle_count = fluid_particle_counts[i];
-
-        if (idx >= particle_count)
-        {
-            continue;
-        }
-
-        uint particle_offset = fluid_particle_offsets[i];
-
-        float pressure = compute_pressure(idx, particle_count, fluid_particle_pressures + particle_offset, fluid_particle_stiffness + particle_offset, fluid_particle_rest_densities + particle_offset, fluid_particle_densities + particle_offset);
-
-        fluid_particle_pressures[idx + particle_offset] = pressure;
-    }
-}
-
-float3 compute_acceleration(
-    uint idx,
-    uint particle_count,
-    float* fluid_particle_densities,
-    float3* fluid_particle_positions,
-    float* fluid_particle_support_radi,
-    float* fluid_particle_mass,
-    float* fluid_particle_pressures,
-    float* fluid_particle_viscosities,
-    float3* fluid_particle_velocities
-)
-{
-    float particle_density = fluid_particle_densities[idx];
-    float3 particle_position = fluid_particle_positions[idx];
-    float particle_support_radius = fluid_particle_support_radi[idx];
-    float particle_support_radius_2 = particle_support_radius * particle_support_radius;
-    float particle_pressure = fluid_particle_pressures[idx];
-    float3 particle_velocity = fluid_particle_velocities[idx];
-    float particle_viscosity = fluid_particle_viscosities[idx];
-
-    float3 pressure;
-    float3 viscosity;
-    float3 diff;
-    float p_coeff;
-    float3 v_coeff;
-
-    // todo grid based operations
-    for (uint i = 0; i < particle_count; i++)
-    {
-        if (i == idx)
-        {
-            continue;
-        }
-
-        float3 other_position = fluid_particle_positions[i];
-        float3 diff = particle_position - other_position;
-        float magnitude_2 = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
-        if (magnitude_2 <= particle_support_radius_2)
-        {
-            float other_particle_pressure = fluid_particle_pressures[i];
-            float other_particle_mass = fluid_particle_mass[i];
-            float other_particle_density = fluid_particle_densities[i];
-            float3 other_particle_velocity = fluid_particle_velocities[i];
-            float other_particle_volume = other_particle_mass / other_particle_density;
-            p_coeff = (particle_pressure + other_particle_pressure) / 2.0f * other_particle_volume;
-            float diff_mag = length(diff);
-            float pow_mag = (particle_support_radius - diff_mag);
-            pow_mag = pow_mag * pow_mag;
-            float h_mag = particle_support_radius_2 * particle_support_radius_2 * particle_support_radius_2;
-            pressure += diff * ((-45.0f * pow_mag) / (PI * h_mag)) * p_coeff;
-
-            v_coeff = (other_particle_velocity - particle_velocity) * other_particle_volume;
-            viscosity += v_coeff * ((45.0f * (particle_support_radius - diff_mag)) / (PI * h_mag));
-        }
-    }
-    viscosity = viscosity * particle_viscosity;
-
-    float3 force = GRAVITY * particle_density + (viscosity - pressure);
-    float3 acceleration = force / particle_density;
-    return acceleration;
-}
-
-__kernel void compute_forces(
-    uint num_fluids,
-    __global uint* fluid_particle_offsets,
-    __global uint* fluid_particle_counts,
-    __global float* fluid_particle_densities,
-    __global float3* fluid_particle_positions,
-    __global float* fluid_particle_support_radi,
-    __global float* fluid_particle_mass,
-    __global float* fluid_particle_pressures,
-    __global float* fluid_particle_viscosities,
-    __global float3* fluid_particle_velocities,
-    __global float3* fluid_particle_accelerations
-)
-{
-    uint idx = get_global_id(0);
-
-    for (uint i = 0; i < num_fluids; i++)
-    {
-        uint particle_count = fluid_particle_counts[i];
-
-        if (idx >= particle_count)
-        {
-            continue;
-        }
-
-        uint particle_offset = fluid_particle_offsets[i];
-
-        float3 acceleration = compute_acceleration(idx, particle_count, fluid_particle_densities + particle_offset, fluid_particle_positions + particle_offset, fluid_particle_support_radi + particle_offset, fluid_particle_mass + particle_offset, fluid_particle_pressures + particle_offset, fluid_particle_viscosities + particle_offset, fluid_particle_velocities + particle_offset);
-
-        fluid_particle_accelerations[idx + particle_offset] = acceleration;
-    }
-}
-
-void compute_position
+__kernel void sort_spatial_indices
 (
-    float dt,
-    uint idx,
-    uint particle_count,
-    float3 min_bounds,
-    float3 max_bounds,
-    float3* fluid_particle_positions,
-    float3* fluid_particle_old_positions,
-    float3* fluid_particle_velocities,
-    float3* fluid_particle_velocities_half,
-    float3* fluid_particle_accelerations
-)
-{
-    float3 velocity_half = fluid_particle_velocities_half[idx];
-    float3 acceleration = fluid_particle_accelerations[idx];
-    float3 position = fluid_particle_positions[idx];
-    float rest_coefficient = 0.9f;
-
-    float3 temp_velocity_half = velocity_half + acceleration * dt;
-    float3 temp_position = position + (temp_velocity_half * dt);
-    float3 temp_velocity = velocity_half;
-
-    if (temp_position.x > max_bounds.x)
-    {
-        temp_position.x = max_bounds.x;
-        temp_velocity.x = -rest_coefficient * temp_velocity_half.x;
-        temp_velocity_half.x = -rest_coefficient * temp_velocity_half.x;
-    }
-    else if (temp_position.x < min_bounds.x)
-    {
-        temp_position.x = min_bounds.x;
-        temp_velocity.x = -rest_coefficient * temp_velocity_half.x;
-        temp_velocity_half.x = -rest_coefficient * temp_velocity_half.x;
-    }
-    if (temp_position.y > max_bounds.y)
-    {
-        temp_position.y = max_bounds.y;
-        temp_velocity.y = -rest_coefficient * temp_velocity_half.y;
-        temp_velocity_half.y = -rest_coefficient * temp_velocity_half.y;
-    }
-    else if (temp_position.y < min_bounds.x)
-    {
-        temp_position.y = min_bounds.y;
-        temp_velocity.y = -rest_coefficient * temp_velocity_half.y;
-        temp_velocity_half.y = -rest_coefficient * temp_velocity_half.y;
-    }
-    if (temp_position.z > max_bounds.z)
-    {
-        temp_position.z = max_bounds.z;
-        temp_velocity.z = -rest_coefficient * temp_velocity_half.z;
-        temp_velocity_half.z = -rest_coefficient * temp_velocity_half.z;
-    }
-    else if (temp_position.z < min_bounds.z)
-    {
-        temp_position.z = min_bounds.z;
-        temp_velocity.z = -rest_coefficient * temp_velocity_half.z;
-        temp_velocity_half.z = -rest_coefficient * temp_velocity_half.z;
-    }
-
-    fluid_particle_old_positions[idx] = position;
-    fluid_particle_velocities_half[idx] = temp_velocity_half;
-    fluid_particle_positions[idx] = temp_position;
-    fluid_particle_velocities[idx] = temp_velocity;
-}
-
-
-__kernel void compute_positions
-(
-    float dt,
-    uint num_fluids,
-    __global uint* fluid_particle_offsets,
-    __global uint* fluid_particle_counts,
-    __global float3* fluid_min_bounds,
-    __global float3* fluid_max_bounds,
-    __global float3* fluid_particle_positions,
-    __global float3* fluid_particle_old_positions,
-    __global float3* fluid_particle_velocities,
-    __global float3* fluid_particle_velocities_half,
-    __global float3* fluid_particle_accelerations
+    uint num_particles,
+    uint group_width,
+    uint group_height,
+    uint step_index,
+    __global uint3* spatial_indices
 )
 {
     uint idx = get_global_id(0);
-    for (uint i = 0; i < num_fluids; i++)
+    uint h_index = idx & (group_width - 1);
+    uint index_left = h_index + (group_height + 1) * (idx / group_width);
+    uint right_step_size = step_index == 0 ? group_height - 2 * h_index : (group_height + 1) / 2;
+    uint index_right = index_left + right_step_size;
+
+    if (index_right >= num_particles) return;
+
+    uint3 left_value = spatial_indices[index_left];
+    uint3 right_value = spatial_indices[index_right];
+
+    if (left_value.z <= right_value.z) return;
+
+    spatial_indices[index_left] = right_value;
+    spatial_indices[index_right] = left_value;
+}
+
+__kernel void calculate_offsets(
+    uint num_particles,
+    __global uint3* spatial_indices,
+    __global uint* spatial_offsets
+)
+{
+    uint idx = get_global_id(0);
+    if (idx >= num_particles)
     {
-        uint particle_count = fluid_particle_counts[i];
-
-        if (idx >= particle_count)
-        {
-            continue;
-        }
-
-        uint particle_offset = fluid_particle_offsets[i];
-        compute_position(dt, idx, particle_count, fluid_min_bounds[i], fluid_max_bounds[i], fluid_particle_positions + particle_offset, fluid_particle_old_positions + particle_offset, fluid_particle_velocities + particle_offset, fluid_particle_velocities_half + particle_offset, fluid_particle_accelerations + particle_offset);
+        return;
     }
+
+    uint3 value = spatial_indices[idx];
+    uint key_prev = idx == 0 ? num_particles : spatial_indices[idx - 1].z;
+
+    if (value.z == key_prev) return;
+
+    spatial_offsets[value.z] = idx;
 }
 
 
-__kernel void simulate(
-    uint num_fluids,
-    __global uint* fluid_particle_offsets,
-    __global float3* fluid_min_bounds,
-    __global float3* fluid_max_bounds,
-    __global uint* fluid_particle_counts,
-    __global uint* fluid_particle_ids,
-    __global float* fluid_particle_mass,
-    __global float* fluid_particle_pressures,
-    __global float* fluid_particle_stiffness,
-    __global float* fluid_particle_rest_densities,
-    __global float* fluid_particle_densities,
-    __global float* fluid_particle_viscosities,
-    __global float3* fluid_particle_positions,
-    __global float3* fluid_particle_old_positions,
-    __global float3* fluid_particle_velocities,
-    __global float3* fluid_particle_accelerations,
-    __global float* fluid_particle_support_radi,
-    __global float* fluid_particle_thresholds,
-    __global float* fluid_particle_surface_tensions
+// -------------------------------------------- SIMULATION -------------------------------------------------
+
+__kernel void external_forces(
+    float delta_time,
+    uint num_particles,
+    float gravity,
+    __global float3* particle_positions,
+    __global float3* predicted_particle_positions,
+    __global float3* particle_velocities
 )
 {
+    uint idx = get_global_id(0);
+    if (idx >= num_particles)
+    {
+        return;
+    }
 
+    float3 velocity = particle_velocities[idx];
+    float3 position = particle_positions[idx];
+    velocity += (float3)(0, gravity, 0) * delta_time;
+
+    // mul by constant framerate for consistent simulations
+    float3 predicted_position = position + velocity * (1 / 120.0f);
+
+    predicted_particle_positions[idx] = predicted_position;
+    particle_velocities[idx] = velocity;
+}
+
+
+__kernel void update_spatial_hash
+(
+    uint num_particles,
+    float smoothing_radius,
+    __global float3* predicted_particle_positions,
+    __global uint3* spatial_indices,
+    __global uint* spatial_offsets
+)
+{
+    uint idx = get_global_id(0);
+    if (idx >= num_particles)
+    {
+        return;
+    }
+
+    float3 predicted_position = predicted_particle_positions[idx];
+
+    spatial_offsets[idx] = num_particles;
+
+    int3 cell = get_cell(predicted_position, smoothing_radius);
+    uint hash = hash_cell(cell);
+    uint key = key_from_hash(hash, num_particles);
+
+    spatial_indices[idx] = (uint3)(idx, hash, key);
+}
+
+__kernel void calculate_densities(
+    uint num_particles,
+    float smoothing_radius,
+    __global float3* predicted_particle_positions,
+    __global float2* particle_densities,
+    __global uint3* spatial_indices,
+    __global uint* spatial_offsets
+)
+{
+    uint idx = get_global_id(0);
+    if (idx >= num_particles)
+    {
+        return;
+    }
+
+    float3 position = predicted_particle_positions[idx];
+    int3 origin_cell = get_cell(position, smoothing_radius);
+    float radius_2 = smoothing_radius * smoothing_radius;
+    float density = 0;
+    float near_density = 0;
+
+    for (int i = 0; i < 27; i ++)
+    {
+        uint hash = hash_cell(origin_cell + sp_offsets[i]);
+        uint key = key_from_hash(hash, num_particles);
+        uint current_index = spatial_offsets[key];
+
+        while (current_index < num_particles)
+        {
+            uint3 index_data = spatial_indices[current_index];
+            current_index++;
+
+            // Exit if no longer looking at correct bin
+            if (index_data.z != key) break;
+            // Skip if hash does not match
+            if (index_data.y != hash) continue;
+
+            uint neighbour_index = index_data.x;
+            float3 neighbour_position = predicted_particle_positions[neighbour_index];
+            float3 diff = neighbour_position - position;
+            float distance_2 = dot(diff, diff);
+
+            // Skip if not within radius
+            if (distance_2 > radius_2) continue;
+
+            // Calculate density and near density
+            float distance = sqrt(distance_2);
+            float scale = 15 / (2 * PI * radius_2 * radius_2 * smoothing_radius); // radius ^ 5
+            float near_scale = 15 / (2 * PI * radius_2 * radius_2 * radius_2); // radius ^ 6
+            float v = smoothing_radius - distance;
+            float v_2 = v * v;
+            density += v_2 * scale;
+            near_density += v_2 * v * near_scale;
+        }
+    }
+
+    particle_densities[idx] = (float2)(density, near_density);
+}
+
+__kernel void calculate_pressure_force(
+    float delta_time,
+    uint num_particles,
+    float smoothing_radius,
+    float target_density,
+    float pressure_multiplier,
+    float near_pressure_multiplier,
+    __global float3* predicted_particle_positions,
+    __global float3* particle_velocities,
+    __global float2* particle_densities,
+    __global uint3* spatial_indices,
+    __global uint* spatial_offsets
+)
+{
+    uint idx = get_global_id(0);
+    if (idx >= num_particles)
+    {
+        return;
+    }
+
+    float2 densities = particle_densities[idx];
+    float3 position = predicted_particle_positions[idx];
+    float3 velocity = particle_velocities[idx];
+
+    float density = densities.x;
+    float near_density = densities.y;
+
+    float pressure = (density - target_density) * pressure_multiplier;
+    float near_pressure = near_density * near_pressure_multiplier;
+
+    float3 pressure_force = (float3)0.0f;
+
+    int3 origin_cell = get_cell(position, smoothing_radius);
+    float radius_2 = smoothing_radius * smoothing_radius;
+
+    for (int i = 0; i < 27; i ++)
+    {
+        uint hash = hash_cell(origin_cell + sp_offsets[i]);
+        uint key = key_from_hash(hash, num_particles);
+        uint current_index = spatial_offsets[key];
+
+        while (current_index < num_particles)
+        {
+            uint3 index_data = spatial_indices[current_index];
+            current_index++;
+
+            // Exit if no longer looking at correct bin
+            if (index_data.z != key) break;
+            // Skip if hash does not match
+            if (index_data.y != hash) continue;
+
+            uint neighbour_index = index_data.x;
+
+            // skip self
+            if (neighbour_index == idx) continue;
+
+            float3 neighbour_position = predicted_particle_positions[neighbour_index];
+            float3 diff = neighbour_position - position;
+            float distance_2 = dot(diff, diff);
+
+            // Skip if not within radius
+            if (distance_2 > radius_2) continue;
+
+            // calc pressure_force
+            float2 neighbour_densities = particle_densities[neighbour_index];
+            float neighbour_density = neighbour_densities.x;
+            float neighbour_near_density = neighbour_densities.y;
+            float neighbour_pressure = (neighbour_density - target_density) * pressure_multiplier;
+            float neighbour_near_pressure = neighbour_near_density * near_pressure_multiplier;
+
+            float shared_pressure = (pressure + neighbour_pressure) / 2;
+            float shared_near_pressure = (near_pressure + neighbour_near_pressure) / 2;
+
+            float distance = sqrt(distance_2);
+
+            // go up if points on same position
+            float3 direction = distance > 0 ? diff / distance : (float3)(0.0f, 1.0f, 0.0f);
+
+            float radius_4 = radius_2 * radius_2;
+            float pressure_scale = 15.0f / (radius_4 * smoothing_radius * PI);
+            float near_pressure_scale = 45.0f / (radius_4 * radius_2 * PI);
+            float v = smoothing_radius - distance;
+
+            pressure_force += direction * (-v * pressure_scale) * shared_pressure / neighbour_density;
+            pressure_force += direction * (-v * v * near_pressure_scale) * shared_near_pressure / neighbour_near_density;
+        }
+    }
+
+    float3 acceleration = pressure_force / density;
+    particle_velocities[idx] = velocity + acceleration * delta_time;
+}
+
+__kernel void calculate_viscosity(
+    float delta_time,
+    uint num_particles,
+    float smoothing_radius,
+    float viscosity_strength,
+    __global float3* predicted_particle_positions,
+    __global float3* particle_velocities,
+    __global uint3* spatial_indices,
+    __global uint* spatial_offsets
+)
+{
+    uint idx = get_global_id(0);
+    if (idx >= num_particles)
+    {
+        return;
+    }
+
+    float3 position = predicted_particle_positions[idx];
+    float3 velocity = particle_velocities[idx];
+
+    int3 origin_cell = get_cell(position, smoothing_radius);
+    float radius_2 = smoothing_radius * smoothing_radius;
+
+    float3 viscosity_force = 0.0f;
+
+    for (int i = 0; i < 27; i ++)
+    {
+        uint hash = hash_cell(origin_cell + sp_offsets[i]);
+        uint key = key_from_hash(hash, num_particles);
+        uint current_index = spatial_offsets[key];
+
+        while (current_index < num_particles)
+        {
+            uint3 index_data = spatial_indices[current_index];
+            current_index++;
+
+            // Exit if no longer looking at correct bin
+            if (index_data.z != key) break;
+            // Skip if hash does not match
+            if (index_data.y != hash) continue;
+
+            uint neighbour_index = index_data.x;
+
+            // skip self
+            if (neighbour_index == idx) continue;
+
+            float3 neighbour_position = predicted_particle_positions[neighbour_index];
+            float3 diff = neighbour_position - position;
+            float distance_2 = dot(diff, diff);
+
+            // Skip if not within radius
+            if (distance_2 > radius_2) continue;
+
+            float3 neighbour_velocity = particle_velocities[neighbour_index];
+
+            float radius_4 = radius_2 * radius_2;
+
+            float scale = 315.0f / (64 * PI * radius_4 * radius_4 * smoothing_radius);
+            float v = radius_2 - distance_2;
+            viscosity_force += (neighbour_velocity - velocity) * v * v * v * scale;
+        }
+    }
+    particle_velocities[idx] = velocity + viscosity_force * viscosity_strength * delta_time;
+}
+
+__kernel void update_positions
+(
+    float delta_time,
+    uint num_particles,
+    float collision_damping,
+    struct mat4 local_to_world,
+    struct mat4 world_to_local,
+    __global float3* particle_positions,
+    __global float3* particle_velocities
+)
+{
+    uint idx = get_global_id(0);
+    if (idx >= num_particles)
+    {
+        return;
+    }
+
+    float3 position = particle_positions[idx];
+    float3 velocity = particle_velocities[idx];
+
+    position += velocity * delta_time;
+
+    float3 position_local = transform_position(&position, &world_to_local);
+    float3 velocity_local = transform_vector(&velocity, &world_to_local);
+
+    float3 half_size = (float3)0.5f;
+    float3 edge_distance = half_size - fabs(position_local);
+
+    if (edge_distance.x <= 0.0f)
+    {
+        position_local.x = half_size.x * sign(position_local.x);
+        velocity_local.x *= -1.0f * collision_damping;
+    }
+    if (edge_distance.y <= 0.0f)
+    {
+        position_local.y = half_size.y * sign(position_local.y);
+        velocity_local.y *= -1.0f * collision_damping;
+    }
+    if (edge_distance.z <= 0.0f)
+    {
+        position_local.z = half_size.z * sign(position_local.z);
+        velocity_local.z *= -1.0f * collision_damping;
+    }
+
+
+    position = transform_position(&position_local, &local_to_world);
+    velocity = transform_vector(&velocity_local, &local_to_world);
+
+    particle_positions[idx] = position;
+    particle_velocities[idx] = velocity;
 }

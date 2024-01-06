@@ -6,13 +6,22 @@ use crate::scene::GPUScene;
 use crate::surface::{SCRHEIGHT, SCRWIDTH};
 use crate::blue_noise::load_blue_noise_from_file;
 
+#[derive(PartialEq, Copy, Clone)]
+pub enum GPURenderMode
+{
+    Debug,
+    PathTracer
+}
+
 pub struct GPURenderer
 {
+    pub render_mode: GPURenderMode,
     generate_rays_kernel: OpenCLKernel,
     extend_kernel: OpenCLKernel,
     shade_kernel: OpenCLKernel,
     connect_kernel: OpenCLKernel,
     finalize_kernel: OpenCLKernel,
+    debug_kernel: OpenCLKernel,
     num_rays: OpenCLBuffer<u32>,
     write_back_ids: OpenCLBuffer<u32>,
     ts: OpenCLBuffer<f32>,
@@ -55,6 +64,9 @@ impl GPURenderer
 
         let finalize_program = OpenCLProgram::from_file(cl, path::Path::new("./src/kernels/finalize.cl"));
         let finalize_kernel = OpenCLKernel::from_program(cl, &finalize_program, "finalize");
+
+        let debug_program = OpenCLProgram::from_file(cl, path::Path::new("./src/kernels/debug.cl"));
+        let debug_kernel = OpenCLKernel::from_program(cl, &debug_program, "debug");
 
         let num_primary_rays = SCRWIDTH * SCRHEIGHT;
         let num_bounces = 10;
@@ -139,6 +151,15 @@ impl GPURenderer
         extend_kernel.set_argument(5, &normals);
         extend_kernel.set_argument(6, &materials);
 
+        debug_kernel.set_argument(0, num_bounces as u32);
+        debug_kernel.set_argument(1, &num_rays);
+        debug_kernel.set_argument(2, &ts);
+        debug_kernel.set_argument(3, &origins);
+        debug_kernel.set_argument(4, &directions);
+        debug_kernel.set_argument(5, &normals);
+        debug_kernel.set_argument(6, &materials);
+        debug_kernel.set_argument(36, &output_buffer);
+
         shade_kernel.set_argument(3, SCRWIDTH as u32);
         shade_kernel.set_argument(4, &blue_noise_texture);
         shade_kernel.set_argument(5, &num_rays);
@@ -174,11 +195,13 @@ impl GPURenderer
 
         GPURenderer
         {
+            render_mode: GPURenderMode::Debug,
             generate_rays_kernel,
             extend_kernel,
             shade_kernel,
             connect_kernel,
             finalize_kernel,
+            debug_kernel,
             write_back_ids,
             ts,
             origins,
@@ -228,15 +251,43 @@ impl GPURenderer
         self.extend_kernel.set_argument(27, &scene.mesh_triangles);
         self.extend_kernel.set_argument(28, &scene.mesh_triangle_normals);
         self.extend_kernel.set_argument(29, &scene.mesh_materials);
-        self.extend_kernel.set_argument(30, scene.fluid_system.particle_offsets.host_buffer.len() as u32);
-        self.extend_kernel.set_argument(31, &scene.fluid_system.particle_offsets);
-        self.extend_kernel.set_argument(32, &scene.fluid_system.min_bounds);
-        self.extend_kernel.set_argument(33, &scene.fluid_system.max_bounds);
-        self.extend_kernel.set_argument(34, &scene.fluid_system.particle_counts);
-        self.extend_kernel.set_argument(35, &scene.fluid_system.particle_ids);
-        self.extend_kernel.set_argument(36, &scene.fluid_system.particle_positions);
-        self.extend_kernel.set_argument(37, &scene.fluid_system.particle_colors);
+        self.extend_kernel.set_argument(30, scene.fluid_system.settings.num_particles);
+        self.extend_kernel.set_argument(31, &scene.fluid_system.settings.local_to_world);
+        self.extend_kernel.set_argument(32, &scene.fluid_system.settings.world_to_local);
+        self.extend_kernel.set_argument(33, &scene.fluid_system.particle_positions);
+        self.extend_kernel.set_argument(34, &scene.fluid_system.particle_velocities);
+        self.extend_kernel.set_argument(35, &scene.fluid_system.particle_densities);
 
+
+        self.debug_kernel.set_argument(7, scene.sphere_positions.host_buffer.len() as u32);
+        self.debug_kernel.set_argument(8, &scene.sphere_positions);
+        self.debug_kernel.set_argument(9, &scene.sphere_radi);
+        self.debug_kernel.set_argument(10, &scene.sphere_materials);
+        self.debug_kernel.set_argument(11, scene.plane_normals.host_buffer.len() as u32);
+        self.debug_kernel.set_argument(12, &scene.plane_normals);
+        self.debug_kernel.set_argument(13, &scene.plane_distances);
+        self.debug_kernel.set_argument(14, &scene.plane_materials);
+        self.debug_kernel.set_argument(15, scene.quad_sizes.host_buffer.len() as u32);
+        self.debug_kernel.set_argument(16, &scene.quad_sizes);
+        self.debug_kernel.set_argument(17, &scene.quad_inv_transforms);
+        self.debug_kernel.set_argument(18, &scene.quad_materials);
+        self.debug_kernel.set_argument(19, scene.mesh_offsets.host_buffer.len() as u32);
+        self.debug_kernel.set_argument(20, &scene.mesh_offsets);
+        self.debug_kernel.set_argument(21, &scene.mesh_triangle_offsets);
+        self.debug_kernel.set_argument(22, &scene.mesh_inv_transforms);
+        self.debug_kernel.set_argument(23, &scene.mesh_min_bounds);
+        self.debug_kernel.set_argument(24, &scene.mesh_max_bounds);
+        self.debug_kernel.set_argument(25, &scene.mesh_tri_counts);
+        self.debug_kernel.set_argument(26, &scene.mesh_left_firsts);
+        self.debug_kernel.set_argument(27, &scene.mesh_triangles);
+        self.debug_kernel.set_argument(28, &scene.mesh_triangle_normals);
+        self.debug_kernel.set_argument(29, &scene.mesh_materials);
+        self.debug_kernel.set_argument(30, scene.fluid_system.settings.num_particles);
+        self.debug_kernel.set_argument(31, &scene.fluid_system.settings.local_to_world);
+        self.debug_kernel.set_argument(32, &scene.fluid_system.settings.world_to_local);
+        self.debug_kernel.set_argument(33, &scene.fluid_system.particle_positions);
+        self.debug_kernel.set_argument(34, &scene.fluid_system.particle_velocities);
+        self.debug_kernel.set_argument(35, &scene.fluid_system.particle_densities);
 
         self.shade_kernel.set_argument(19, scene.quad_sizes.host_buffer.len() as u32);
         self.shade_kernel.set_argument(20, &scene.quad_sizes);
@@ -271,34 +322,53 @@ impl GPURenderer
 
     pub fn render(&mut self, cl: &OpenCL, scene: &GPUScene, camera: &Camera)
     {
+        // todo only update when necessary
+        self.extend_kernel.set_argument(30, scene.fluid_system.settings.num_particles);
+        self.extend_kernel.set_argument(31, &scene.fluid_system.settings.local_to_world);
+        self.extend_kernel.set_argument(32, &scene.fluid_system.settings.world_to_local);
+        self.extend_kernel.set_argument(33, &scene.fluid_system.particle_positions);
+
         self.num_rays.copy_to_device(cl);
 
         self.generate_rays_kernel.set_argument(0, self.seed);
         random_uint_s(&mut self.seed);
 
-        self.generate_rays_kernel.run2d(cl, SCRWIDTH, SCRHEIGHT);
-        self.shade_kernel.set_argument(2, self.rendered_frames);
-        self.finalize_kernel.set_argument(0, self.rendered_frames);
-
-        for bounces in 0u32..self.num_bounces
+        if self.render_mode == GPURenderMode::PathTracer
         {
-            self.extend_kernel.set_argument(0, bounces);
-            self.extend_kernel.run(cl, self.num_primary_rays);
-            self.shade_kernel.set_argument(0, self.seed);
-            self.shade_kernel.set_argument(1, bounces);
-            random_uint_s(&mut self.seed);
-            self.shade_kernel.run(cl, self.num_primary_rays);
+            self.generate_rays_kernel.run2d(cl, SCRWIDTH, SCRHEIGHT);
+            self.shade_kernel.set_argument(2, self.rendered_frames);
+            self.finalize_kernel.set_argument(0, self.rendered_frames);
 
-            self.connect_kernel.set_argument(0, bounces);
-            self.connect_kernel.run(cl, self.num_primary_rays);
+            for bounces in 0u32..self.num_bounces
+            {
+                self.extend_kernel.set_argument(0, bounces);
+                self.extend_kernel.run(cl, self.num_primary_rays);
+                self.shade_kernel.set_argument(0, self.seed);
+                self.shade_kernel.set_argument(1, bounces);
+                random_uint_s(&mut self.seed);
+                self.shade_kernel.run(cl, self.num_primary_rays);
+
+                self.connect_kernel.set_argument(0, bounces);
+                self.connect_kernel.run(cl, self.num_primary_rays);
+            }
+
+            self.finalize_kernel.run(cl, self.num_primary_rays);
+
+            cl.flush_queue();
+
+            self.output_buffer.copy_from_device(cl);
+
+            self.rendered_frames += 1;
+        }
+        else if self.render_mode == GPURenderMode::Debug
+        {
+            self.generate_rays_kernel.run2d(cl, SCRWIDTH, SCRHEIGHT);
+            self.debug_kernel.set_argument(0, 0u32);
+            self.debug_kernel.run(cl, self.num_primary_rays);
+            cl.flush_queue();
+
+            self.output_buffer.copy_from_device(cl);
         }
 
-        self.finalize_kernel.run(cl, self.num_primary_rays);
-
-        cl.flush_queue();
-
-        self.output_buffer.copy_from_device(cl);
-
-        self.rendered_frames += 1;
     }
 }

@@ -613,6 +613,18 @@ impl<T> SetArgument<&OpenCLBuffer<T>> for OpenCLKernel
     }
 }
 
+impl SetArgument<&Mat4> for OpenCLKernel
+{
+    fn set_argument(&self, idx: u32, value: &Mat4) {
+        unsafe
+        {
+            let pointer: *const Mat4 = value;
+            set_kernel_arg(self.kernel, idx, std::mem::size_of::<Mat4>(), pointer as *const c_void)
+                .expect("Failed to set kernel Mat4")
+        }
+    }
+}
+
 pub struct OpenCLBuffer<T>
 {
     pub host_buffer: Vec<T>,
