@@ -1,59 +1,6 @@
 #include "src/kernels/tools/constants.cl"
 #include "src/kernels/types/mat4.cl"
-
-// ----------------------------------------- SPATIAL HASHING -----------------------------------------------
-const int3 sp_offsets[27] =
-{
-    (int3)(-1, -1, -1),
-	(int3)(-1, -1, 0),
-	(int3)(-1, -1, 1),
-	(int3)(-1, 0, -1),
-	(int3)(-1, 0, 0),
-	(int3)(-1, 0, 1),
-	(int3)(-1, 1, -1),
-	(int3)(-1, 1, 0),
-	(int3)(-1, 1, 1),
-	(int3)(0, -1, -1),
-	(int3)(0, -1, 0),
-	(int3)(0, -1, 1),
-	(int3)(0, 0, -1),
-	(int3)(0, 0, 0),
-	(int3)(0, 0, 1),
-	(int3)(0, 1, -1),
-	(int3)(0, 1, 0),
-	(int3)(0, 1, 1),
-	(int3)(1, -1, -1),
-	(int3)(1, -1, 0),
-	(int3)(1, -1, 1),
-	(int3)(1, 0, -1),
-	(int3)(1, 0, 0),
-	(int3)(1, 0, 1),
-	(int3)(1, 1, -1),
-	(int3)(1, 1, 0),
-	(int3)(1, 1, 1)
-};
-
-const uint hash1 = 15823;
-const uint hash2 = 9737333;
-const uint hash3 = 440817757;
-
-// Convert floating point position into an integer cell coordinate
-int3 get_cell(float3 position, float radius)
-{
-    float3 floored = floor(position / radius);
-	return (int3)((int)floored.x, (int)floored.y, (int)floored.z);
-}
-
-// Hash cell coordinate to a single unsigned integer
-uint hash_cell(int3 cell)
-{
-	return (((uint)cell.x) * hash1) + (((uint)cell.y) * hash2) + (((uint)cell.z) * hash3);
-}
-
-uint key_from_hash(uint hash, uint tableSize)
-{
-	return hash % tableSize;
-}
+#include "src/kernels/fluid_simulation/spatial_hashing.cl"
 
 // ----------------------------------------- SORTING -------------------------------------------------------
 
@@ -72,12 +19,18 @@ __kernel void sort_spatial_indices
     uint right_step_size = step_index == 0 ? group_height - 2 * h_index : (group_height + 1) / 2;
     uint index_right = index_left + right_step_size;
 
-    if (index_right >= num_particles) return;
+    if (index_right >= num_particles)
+    {
+        return;
+    }
 
     uint3 left_value = spatial_indices[index_left];
     uint3 right_value = spatial_indices[index_right];
 
-    if (left_value.z <= right_value.z) return;
+    if (left_value.z <= right_value.z)
+    {
+        return;
+    }
 
     spatial_indices[index_left] = right_value;
     spatial_indices[index_right] = left_value;
@@ -150,13 +103,14 @@ __kernel void update_spatial_hash
 
     float3 predicted_position = predicted_particle_positions[idx];
 
-    spatial_offsets[idx] = num_particles;
-
     int3 cell = get_cell(predicted_position, smoothing_radius);
     uint hash = hash_cell(cell);
     uint key = key_from_hash(hash, num_particles);
 
     spatial_indices[idx] = (uint3)(idx, hash, key);
+
+    // reset offsets
+    spatial_offsets[idx] = num_particles;
 }
 
 __kernel void calculate_densities(
@@ -180,7 +134,7 @@ __kernel void calculate_densities(
     float density = 0;
     float near_density = 0;
 
-    for (int i = 0; i < 27; i ++)
+    for (int i = 0; i < 27; i++)
     {
         uint hash = hash_cell(origin_cell + sp_offsets[i]);
         uint key = key_from_hash(hash, num_particles);
@@ -197,23 +151,26 @@ __kernel void calculate_densities(
             if (index_data.y != hash) continue;
 
             uint neighbour_index = index_data.x;
-            float3 neighbour_position = predicted_particle_positions[neighbour_index];
-            float3 diff = neighbour_position - position;
-            float distance_2 = dot(diff, diff);
 
-            // Skip if not within radius
-            if (distance_2 > radius_2) continue;
-
-            // Calculate density and near density
-            float distance = sqrt(distance_2);
-            float scale = 15 / (2 * PI * radius_2 * radius_2 * smoothing_radius); // radius ^ 5
-            float near_scale = 15 / (2 * PI * radius_2 * radius_2 * radius_2); // radius ^ 6
-            float v = smoothing_radius - distance;
-            float v_2 = v * v;
-            density += v_2 * scale;
-            near_density += v_2 * v * near_scale;
         }
     }
+
+    UNROLLED_NEIGHBOURHOOD(
+        float3 neighbour_position = predicted_particle_positions[neighbour_index];
+        float3 diff = neighbour_position - position;
+        float distance_2 = dot(diff, diff);
+
+        // Skip if not within radius
+        if (distance_2 > radius_2) continue;
+
+        // Calculate density and near density
+        float distance = sqrt(distance_2);
+        float scale = 15 / (2 * PI * radius_2 * radius_2 * smoothing_radius); // radius ^ 5
+        float near_scale = 15 / (PI * radius_2 * radius_2 * radius_2); // radius ^ 6
+        float v = smoothing_radius - distance;
+        float v_2 = v * v;
+        density += v_2 * scale;
+        near_density += v_2 * v * near_scale;);
 
     particle_densities[idx] = (float2)(density, near_density);
 }
@@ -253,58 +210,40 @@ __kernel void calculate_pressure_force(
     int3 origin_cell = get_cell(position, smoothing_radius);
     float radius_2 = smoothing_radius * smoothing_radius;
 
-    for (int i = 0; i < 27; i ++)
-    {
-        uint hash = hash_cell(origin_cell + sp_offsets[i]);
-        uint key = key_from_hash(hash, num_particles);
-        uint current_index = spatial_offsets[key];
 
-        while (current_index < num_particles)
-        {
-            uint3 index_data = spatial_indices[current_index];
-            current_index++;
+    UNROLLED_NEIGHBOURHOOD(
+        // skip self
+        if (neighbour_index == idx) continue;
 
-            // Exit if no longer looking at correct bin
-            if (index_data.z != key) break;
-            // Skip if hash does not match
-            if (index_data.y != hash) continue;
+        float3 neighbour_position = predicted_particle_positions[neighbour_index];
+        float3 diff = neighbour_position - position;
+        float distance_2 = dot(diff, diff);
 
-            uint neighbour_index = index_data.x;
+        // Skip if not within radius
+        if (distance_2 > radius_2) continue;
 
-            // skip self
-            if (neighbour_index == idx) continue;
+        // calc pressure_force
+        float2 neighbour_densities = particle_densities[neighbour_index];
+        float neighbour_density = neighbour_densities.x;
+        float neighbour_near_density = neighbour_densities.y;
+        float neighbour_pressure = (neighbour_density - target_density) * pressure_multiplier;
+        float neighbour_near_pressure = neighbour_near_density * near_pressure_multiplier;
 
-            float3 neighbour_position = predicted_particle_positions[neighbour_index];
-            float3 diff = neighbour_position - position;
-            float distance_2 = dot(diff, diff);
+        float shared_pressure = (pressure + neighbour_pressure) / 2;
+        float shared_near_pressure = (near_pressure + neighbour_near_pressure) / 2;
 
-            // Skip if not within radius
-            if (distance_2 > radius_2) continue;
+        float distance = sqrt(distance_2);
 
-            // calc pressure_force
-            float2 neighbour_densities = particle_densities[neighbour_index];
-            float neighbour_density = neighbour_densities.x;
-            float neighbour_near_density = neighbour_densities.y;
-            float neighbour_pressure = (neighbour_density - target_density) * pressure_multiplier;
-            float neighbour_near_pressure = neighbour_near_density * near_pressure_multiplier;
+        // go up if points on same position
+        float3 direction = distance > 0 ? diff / distance : (float3)(0.0f, 1.0f, 0.0f);
 
-            float shared_pressure = (pressure + neighbour_pressure) / 2;
-            float shared_near_pressure = (near_pressure + neighbour_near_pressure) / 2;
+        float radius_4 = radius_2 * radius_2;
+        float pressure_scale = 15.0f / (radius_4 * smoothing_radius * PI);
+        float near_pressure_scale = 45.0f / (radius_4 * radius_2 * PI);
+        float v = smoothing_radius - distance;
 
-            float distance = sqrt(distance_2);
-
-            // go up if points on same position
-            float3 direction = distance > 0 ? diff / distance : (float3)(0.0f, 1.0f, 0.0f);
-
-            float radius_4 = radius_2 * radius_2;
-            float pressure_scale = 15.0f / (radius_4 * smoothing_radius * PI);
-            float near_pressure_scale = 45.0f / (radius_4 * radius_2 * PI);
-            float v = smoothing_radius - distance;
-
-            pressure_force += direction * (-v * pressure_scale) * shared_pressure / neighbour_density;
-            pressure_force += direction * (-v * v * near_pressure_scale) * shared_near_pressure / neighbour_near_density;
-        }
-    }
+        pressure_force += direction * (-v * pressure_scale) * shared_pressure / neighbour_density;
+        pressure_force += direction * (-v * v * near_pressure_scale) * shared_near_pressure / neighbour_near_density;);
 
     float3 acceleration = pressure_force / density;
     particle_velocities[idx] = velocity + acceleration * delta_time;
@@ -335,43 +274,25 @@ __kernel void calculate_viscosity(
 
     float3 viscosity_force = 0.0f;
 
-    for (int i = 0; i < 27; i ++)
-    {
-        uint hash = hash_cell(origin_cell + sp_offsets[i]);
-        uint key = key_from_hash(hash, num_particles);
-        uint current_index = spatial_offsets[key];
+    UNROLLED_NEIGHBOURHOOD(
+        // skip self
+        if (neighbour_index == idx) continue;
 
-        while (current_index < num_particles)
-        {
-            uint3 index_data = spatial_indices[current_index];
-            current_index++;
+        float3 neighbour_position = predicted_particle_positions[neighbour_index];
+        float3 diff = neighbour_position - position;
+        float distance_2 = dot(diff, diff);
 
-            // Exit if no longer looking at correct bin
-            if (index_data.z != key) break;
-            // Skip if hash does not match
-            if (index_data.y != hash) continue;
+        // Skip if not within radius
+        if (distance_2 > radius_2) continue;
 
-            uint neighbour_index = index_data.x;
+        float3 neighbour_velocity = particle_velocities[neighbour_index];
 
-            // skip self
-            if (neighbour_index == idx) continue;
+        float radius_4 = radius_2 * radius_2;
 
-            float3 neighbour_position = predicted_particle_positions[neighbour_index];
-            float3 diff = neighbour_position - position;
-            float distance_2 = dot(diff, diff);
+        float scale = 315.0f / (64 * PI * radius_4 * radius_4 * smoothing_radius);
+        float v = radius_2 - distance_2;
+        viscosity_force += (neighbour_velocity - velocity) * v * v * v * scale;);
 
-            // Skip if not within radius
-            if (distance_2 > radius_2) continue;
-
-            float3 neighbour_velocity = particle_velocities[neighbour_index];
-
-            float radius_4 = radius_2 * radius_2;
-
-            float scale = 315.0f / (64 * PI * radius_4 * radius_4 * smoothing_radius);
-            float v = radius_2 - distance_2;
-            viscosity_force += (neighbour_velocity - velocity) * v * v * v * scale;
-        }
-    }
     particle_velocities[idx] = velocity + viscosity_force * viscosity_strength * delta_time;
 }
 

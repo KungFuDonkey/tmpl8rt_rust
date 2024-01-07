@@ -61,7 +61,7 @@ impl FluidSystem
         let calculate_viscosity_kernel = OpenCLKernel::from_program(cl, &fluid_sim_program, "calculate_viscosity");
         let update_positions_kernel = OpenCLKernel::from_program(cl, &fluid_sim_program, "update_positions");
 
-        let initial_particles: u32 = 4096;
+        let initial_particles: u32 = 512;
 
         let mut particle_positions : Vec<Float3> = Vec::with_capacity(MAX_PARTICLES);
         let mut predicted_particle_positions : Vec<Float3> = Vec::with_capacity(MAX_PARTICLES);
@@ -101,10 +101,10 @@ impl FluidSystem
         let num_particles = initial_particles;
         let gravity: f32 = -9.81;
         let collision_damping: f32 = 0.8;
-        let smoothing_radius: f32 = 0.5;
+        let smoothing_radius: f32 = 0.2;
         let target_density: f32 = 900.0;
-        let pressure_multiplier: f32 = 0.4;
-        let near_pressure_multiplier: f32 = 0.4;
+        let pressure_multiplier: f32 = 1.0;
+        let near_pressure_multiplier: f32 = 1.0;
         let viscosity_strength: f32 = 0.001;
 
         let local_to_world: Mat4 = Mat4::identity_matrix();
@@ -319,6 +319,9 @@ impl FluidSystem
         // calc offsets
         self.calculate_offsets_kernel.run(cl, MAX_PARTICLES);
 
+        //self.spatial_indices.copy_from_device(cl);
+        //self.spatial_offsets.copy_from_device(cl);
+
         // calc densities
         self.calculate_densities_kernel.run(cl, MAX_PARTICLES);
 
@@ -326,15 +329,16 @@ impl FluidSystem
         // calc pressures
         self.calculate_pressure_force_kernel.run(cl, MAX_PARTICLES);
 
-        self.particle_velocities.copy_from_device(cl);
+        //self.particle_velocities.copy_from_device(cl);
 
         // calc viscosity
         self.calculate_viscosity_kernel.run(cl, MAX_PARTICLES);
 
-        self.particle_velocities.copy_from_device(cl);
+        //self.particle_velocities.copy_from_device(cl);
 
         // update positions
         self.update_positions_kernel.run(cl, MAX_PARTICLES);
+        //self.particle_positions.copy_from_device(cl);
     }
 
 

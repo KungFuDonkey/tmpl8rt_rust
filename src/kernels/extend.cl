@@ -40,7 +40,10 @@ __kernel void extend(
     struct mat4 fluid_world_to_local,
     __global float3* fluid_particle_positions,
     __global float3* fluid_particle_velocities,
-    __global float3* fluid_particle_densities)
+    __global float3* fluid_particle_densities,
+    __global float3* fluid_predicted_particle_positions,
+    __global uint3* spatial_indices,
+    __global uint* spatial_offsets)
 {
     uint idx = get_global_id(0);
     uint max_idx = num_rays[num_bounces * 2];
@@ -62,7 +65,7 @@ __kernel void extend(
     intersect_quads(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, num_quads, quad_sizes, quad_inv_transforms, quad_materials);
     intersect_meshes(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, num_meshes, mesh_offsets, mesh_triangle_offsets, mesh_inv_transforms, mesh_min_bounds, mesh_max_bounds, mesh_tri_counts, mesh_left_firsts, mesh_triangles, mesh_triangle_normals, mesh_materials);
 
-    intersect_fluid(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, fluid_num_particles, &fluid_local_to_world, &fluid_world_to_local, fluid_particle_positions, fluid_particle_velocities, fluid_particle_densities);
+    intersect_fluid(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, fluid_num_particles, &fluid_local_to_world, &fluid_world_to_local, fluid_particle_positions, fluid_particle_velocities, fluid_particle_densities, fluid_predicted_particle_positions, spatial_indices, spatial_offsets);
     //intersect_fluids(&ray_t, &ray_origin, &ray_direction, &ray_normal, &ray_material, num_fluids, fluid_particle_offsets, fluid_min_bounds, fluid_max_bounds, fluid_particle_counts, fluid_particle_ids, fluid_particle_positions, fluid_particle_colors);
 
     if (ray_t >= original_ray_t)

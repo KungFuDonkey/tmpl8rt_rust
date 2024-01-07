@@ -1,5 +1,6 @@
 #include "src/kernels/objects/aabb.cl"
 #include "src/kernels/objects/spheres.cl"
+#include "src/kernels/fluid_simulation/spatial_hashing.cl"
 
 #define PARTICLE_RADIUS 0.006f
 #define PARTICLE_RADIUS 0.006f
@@ -12,12 +13,15 @@ void intersect_fluid(
     float3* ray_direction,
     float3* ray_normal,
     ulong* ray_material,
-    uint fluid_num_particles,
+    uint num_particles,
     struct mat4* local_to_world,
     struct mat4* world_to_local,
     float3* particle_positions,
     float3* particle_velocities,
-    float3* particle_densities
+    float3* particle_densities,
+    float3* predicted_particle_positions,
+    __global uint3* spatial_indices,
+    __global uint* spatial_offsets
 )
 {
     //{
@@ -33,7 +37,7 @@ void intersect_fluid(
     uint particle_idx = 0;
     // todo do grid based intersection
     bool intersected = false;
-    for (uint i = 0; i < fluid_num_particles; i++)
+    for (uint i = 0; i < num_particles; i++)
     {
         float3 particle_position = particle_positions[i];
         if (intersect_sphere(ray_t, ray_origin, ray_direction, &particle_position, &particle_radius_2))
@@ -43,6 +47,153 @@ void intersect_fluid(
         }
     }
 
+    if (intersected)
+    {
+        float3 particle_position = particle_positions[particle_idx];
+        float3 intersection = *ray_t * *ray_direction + *ray_origin;
+        *ray_normal = (intersection - particle_position) * PARTICLE_INV_RADIUS;
+
+        if (particle_idx == 0)
+        {
+            *ray_material = 255;
+            return;
+        }
+
+        float3 predicted_position = predicted_particle_positions[particle_idx];
+        float smoothing_radius = 0.2;
+        int3 origin_cell = get_cell(predicted_position, smoothing_radius);
+        float radius_2 = smoothing_radius * smoothing_radius;
+        bool set_color = false;
+
+        {
+            uint hash = hash_cell(origin_cell);
+            uint key = key_from_hash(hash, num_particles);
+            uint current_index = spatial_offsets[key];
+
+            while (current_index < num_particles)
+            {
+                uint3 index_data = spatial_indices[current_index];
+                current_index++;
+
+                // Exit if no longer looking at correct bin
+                if (index_data.z != key) break;
+                // Skip if hash does not match
+                if (index_data.y != hash) continue;
+
+                uint neighbour_index = index_data.x;
+
+                if (neighbour_index == 0)
+                {
+                    *ray_material = (255 << 8);
+                    return;
+                }
+            }
+        }
+
+        {
+            uint hash = hash_cell(origin_cell + sp_offsets[23]);
+            uint key = key_from_hash(hash, num_particles);
+            uint current_index = spatial_offsets[key];
+
+            while (current_index < num_particles)
+            {
+                uint3 index_data = spatial_indices[current_index];
+                current_index++;
+
+                // Exit if no longer looking at correct bin
+                if (index_data.z != key) break;
+                // Skip if hash does not match
+                if (index_data.y != hash) continue;
+
+                uint neighbour_index = index_data.x;
+
+                // skip self
+                if (neighbour_index == particle_idx) continue;
+
+                if (neighbour_index == 0)
+                {
+                    *ray_material = (255 << 16) + 255;
+                    set_color = true;
+                }
+            }
+        }
+
+        {
+            uint hash = hash_cell(origin_cell + sp_offsets[22]);
+            uint key = key_from_hash(hash, num_particles);
+            uint current_index = spatial_offsets[key];
+
+            while (current_index < num_particles)
+            {
+                uint3 index_data = spatial_indices[current_index];
+                current_index++;
+
+                // Exit if no longer looking at correct bin
+                if (index_data.z != key) break;
+                // Skip if hash does not match
+                if (index_data.y != hash) continue;
+
+                uint neighbour_index = index_data.x;
+
+                // skip self
+                if (neighbour_index == particle_idx) continue;
+
+                if (neighbour_index == 0)
+                {
+                    *ray_material = (255 << 16) + (255 << 8) + 255;
+                    set_color = true;
+                }
+            }
+        }
+
+        {
+            uint hash = hash_cell(origin_cell + sp_offsets[4]);
+            uint key = key_from_hash(hash, num_particles);
+            uint current_index = spatial_offsets[key];
+
+            while (current_index < num_particles)
+            {
+                uint3 index_data = spatial_indices[current_index];
+                current_index++;
+
+                // Exit if no longer looking at correct bin
+                if (index_data.z != key) break;
+                // Skip if hash does not match
+                if (index_data.y != hash) continue;
+
+                uint neighbour_index = index_data.x;
+
+                // skip self
+                if (neighbour_index == particle_idx) continue;
+
+                if (neighbour_index == 0)
+                {
+                    *ray_material = (255 << 16) + 255;
+                    set_color = true;
+                }
+            }
+        }
+
+
+        UNROLLED_NEIGHBOURHOOD(
+            if (neighbour_index == particle_idx)
+            {
+                continue;
+            }
+
+            if (neighbour_index == 0)
+            {
+                *ray_material = (255 << 16) + (255 << 8);
+                set_color = true;
+            });
+
+        if (!set_color)
+        {
+            *ray_material = (255 << 16);
+        }
+    }
+
+    return;
 
     if (intersected)
     {
@@ -51,7 +202,7 @@ void intersect_fluid(
         float3 velocity = particle_velocities[particle_idx];
         float speed = length(velocity);
 
-        if (speed <= 0)
+        if (speed <= 1.0)
         {
             *ray_material = (128 << 16) + (128 << 8) + 255;
         }

@@ -158,7 +158,7 @@ impl GPURenderer
         debug_kernel.set_argument(4, &directions);
         debug_kernel.set_argument(5, &normals);
         debug_kernel.set_argument(6, &materials);
-        debug_kernel.set_argument(36, &output_buffer);
+        debug_kernel.set_argument(39, &output_buffer);
 
         shade_kernel.set_argument(3, SCRWIDTH as u32);
         shade_kernel.set_argument(4, &blue_noise_texture);
@@ -257,6 +257,9 @@ impl GPURenderer
         self.extend_kernel.set_argument(33, &scene.fluid_system.particle_positions);
         self.extend_kernel.set_argument(34, &scene.fluid_system.particle_velocities);
         self.extend_kernel.set_argument(35, &scene.fluid_system.particle_densities);
+        self.extend_kernel.set_argument(36, &scene.fluid_system.predicted_particle_positions);
+        self.extend_kernel.set_argument(37, &scene.fluid_system.spatial_indices);
+        self.extend_kernel.set_argument(38, &scene.fluid_system.spatial_offsets);
 
 
         self.debug_kernel.set_argument(7, scene.sphere_positions.host_buffer.len() as u32);
@@ -288,6 +291,9 @@ impl GPURenderer
         self.debug_kernel.set_argument(33, &scene.fluid_system.particle_positions);
         self.debug_kernel.set_argument(34, &scene.fluid_system.particle_velocities);
         self.debug_kernel.set_argument(35, &scene.fluid_system.particle_densities);
+        self.debug_kernel.set_argument(36, &scene.fluid_system.predicted_particle_positions);
+        self.debug_kernel.set_argument(37, &scene.fluid_system.spatial_indices);
+        self.debug_kernel.set_argument(38, &scene.fluid_system.spatial_offsets);
 
         self.shade_kernel.set_argument(19, scene.quad_sizes.host_buffer.len() as u32);
         self.shade_kernel.set_argument(20, &scene.quad_sizes);

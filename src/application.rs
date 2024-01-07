@@ -195,7 +195,7 @@ impl Application
             ui.slider_float(ImString::new("Gravity").deref(), &mut self.gpu_scene.fluid_system.settings.gravity, -10.0, 10.0 ).build();
             ui.slider_float(ImString::new("Collision Damping").deref(), &mut self.gpu_scene.fluid_system.settings.collision_damping, 0.001, 1.0).build();
             ui.slider_float(ImString::new("Smoothing Radius").deref(), &mut self.gpu_scene.fluid_system.settings.smoothing_radius, 0.001, 1.0).build();
-            ui.slider_float(ImString::new("Target Density").deref(), &mut self.gpu_scene.fluid_system.settings.target_density, 0.001, 1000.0).build();
+            ui.slider_float(ImString::new("Target Density").deref(), &mut self.gpu_scene.fluid_system.settings.target_density, 0.001, 5000.0).build();
             ui.slider_float(ImString::new("Pressure Multiplier").deref(), &mut self.gpu_scene.fluid_system.settings.pressure_multiplier, 0.001, 4.0).build();
             ui.slider_float(ImString::new("Near Pressure Multiplier").deref(), &mut self.gpu_scene.fluid_system.settings.near_pressure_multiplier, 0.001, 4.0).build();
             ui.slider_float(ImString::new("Viscosity strength").deref(), &mut self.gpu_scene.fluid_system.settings.viscosity_strength, 0.001, 0.075).build();
